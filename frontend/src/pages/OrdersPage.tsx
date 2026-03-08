@@ -11,6 +11,12 @@ import TableRow from '@mui/material/TableRow'
 import Chip from '@mui/material/Chip'
 import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
+import Button from '@mui/material/Button'
+import Fab from '@mui/material/Fab'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
 import FormControl from '@mui/material/FormControl'
 import InputAdornment from '@mui/material/InputAdornment'
 import InputLabel from '@mui/material/InputLabel'
@@ -18,13 +24,14 @@ import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
 import SearchIcon from '@mui/icons-material/Search'
+import AddIcon from '@mui/icons-material/Add'
 import WeekendIcon from '@mui/icons-material/Weekend'
 import BedIcon from '@mui/icons-material/Bed'
 import ChairIcon from '@mui/icons-material/Chair'
 import DinnerDiningIcon from '@mui/icons-material/DinnerDining'
 import KingBedIcon from '@mui/icons-material/KingBed'
 import { ORDER_CATEGORIES, ORDER_STATUSES } from '../types/order'
-import type { OrderCategory, OrderStatus } from '../types/order'
+import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
 import { mockOrders, getOrdersWithDisplayDates } from '../data/mockOrders'
 
 type OrderWithDisplay = ReturnType<typeof getOrdersWithDisplayDates>[number]
@@ -53,6 +60,53 @@ const SORT_OPTIONS = [
 type SortBy = (typeof SORT_OPTIONS)[number]['value']
 
 type FilterStatusValue = '' | OrderStatus | 'flow-asc' | 'flow-desc'
+
+interface NewOrderForm {
+  id: string
+  customerName: string
+  category: OrderCategory
+  model: string
+  size: string
+  deliveryDate: string
+  status: OrderStatus
+  fabric: string
+  foam: string
+}
+
+function getTodayIsoDate(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function generateNextOrderId(orders: OrderItem[]): string {
+  const maxSuffix = orders.reduce((max, order) => {
+    const match = order.id.match(/-(\d{4})$/)
+    if (!match) {
+      return max
+    }
+    const value = Number.parseInt(match[1], 10)
+    return Number.isNaN(value) ? max : Math.max(max, value)
+  }, 0)
+
+  return `GBA-${new Date().getFullYear()}-${String(maxSuffix + 1).padStart(4, '0')}`
+}
+
+function createInitialOrderForm(orders: OrderItem[]): NewOrderForm {
+  return {
+    id: generateNextOrderId(orders),
+    customerName: '',
+    category: ORDER_CATEGORIES[0],
+    model: '',
+    size: '',
+    deliveryDate: getTodayIsoDate(),
+    status: ORDER_STATUSES[0],
+    fabric: '',
+    foam: '',
+  }
+}
 
 function compareOrders(
   a: OrderWithDisplay,
@@ -161,7 +215,8 @@ function OrdersTable({ rows }: { rows: OrderWithDisplay[] }) {
 const categories = ['Todos', ...ORDER_CATEGORIES] as const
 
 function OrdersPage() {
-  const ordersWithDisplay = useMemo(() => getOrdersWithDisplayDates(mockOrders), [])
+  const [orders, setOrders] = useState<OrderItem[]>(() => [...mockOrders])
+  const ordersWithDisplay = useMemo(() => getOrdersWithDisplayDates(orders), [orders])
   const [tab, setTab] = useState<number>(0)
   const [sortBy, setSortBy] = useState<SortBy>('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -169,6 +224,9 @@ function OrdersPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatusValue>('')
   const [filterMaterial, setFilterMaterial] = useState<string>('')
   const [filterFoam, setFilterFoam] = useState<string>('')
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false)
+  const [createOrderError, setCreateOrderError] = useState<string>('')
+  const [newOrderForm, setNewOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm(mockOrders))
 
   const category = categories[tab]
 
@@ -223,16 +281,101 @@ function OrdersPage() {
     setSortBy(value)
   }
 
+  const handleOpenCreateDialog = () => {
+    setCreateOrderError('')
+    setNewOrderForm(createInitialOrderForm(orders))
+    setIsCreateDialogOpen(true)
+  }
+
+  const handleCloseCreateDialog = () => {
+    setIsCreateDialogOpen(false)
+  }
+
+  const handleNewOrderFieldChange = <K extends keyof NewOrderForm,>(field: K, value: NewOrderForm[K]) => {
+    setNewOrderForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleCreateOrder = () => {
+    const generatedId = (newOrderForm.id.trim() || generateNextOrderId(orders)).toUpperCase()
+    if (!newOrderForm.customerName.trim() || !newOrderForm.model.trim() || !newOrderForm.deliveryDate) {
+      setCreateOrderError('Preencha os campos obrigatórios: cliente, modelo e data de entrega.')
+      return
+    }
+
+    if (orders.some((order) => order.id.toUpperCase() === generatedId)) {
+      setCreateOrderError('Já existe um pedido com esse ID. Informe outro identificador.')
+      return
+    }
+
+    const orderToInsert: OrderItem = {
+      id: generatedId,
+      category: newOrderForm.category,
+      model: newOrderForm.model.trim(),
+      size: newOrderForm.size.trim() || undefined,
+      customer: {
+        name: newOrderForm.customerName.trim(),
+        whatsapp: '',
+        email: '',
+      },
+      specs: {
+        hasPainting: false,
+        fabric: newOrderForm.fabric.trim() || undefined,
+        foam: newOrderForm.foam.trim() || undefined,
+        manufactureType: 'Fabricação própria',
+      },
+      quantity: 1,
+      saleValue: 0,
+      deliveryDate: newOrderForm.deliveryDate,
+      status: newOrderForm.status,
+      createdAt: getTodayIsoDate(),
+    }
+
+    setOrders((prev) => [orderToInsert, ...prev])
+    setTab(0)
+    setSearchId('')
+    setFilterStatus('')
+    setFilterMaterial('')
+    setFilterFoam('')
+    setSortBy('createdAt')
+    setSortOrder('desc')
+    setCreateOrderError('')
+    setIsCreateDialogOpen(false)
+  }
+
   return (
-    <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
-      <Typography
-        variant="h5"
-        fontWeight={600}
-        color="text.primary"
-        sx={{ mb: { xs: 2, md: 3 }, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+    <Box sx={{ maxWidth: '100%', overflow: 'hidden', pb: { xs: 10, sm: 0 } }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexDirection: 'row',
+          gap: 2,
+          mb: { xs: 2, md: 3 },
+        }}
       >
-        Pedidos
-      </Typography>
+        <Typography
+          variant="h5"
+          fontWeight={600}
+          color="text.primary"
+          sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+        >
+          Pedidos
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleOpenCreateDialog}
+          sx={{
+            display: { xs: 'none', sm: 'inline-flex' },
+            borderRadius: 2,
+            px: 2.5,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Novo pedido
+        </Button>
+      </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Listagem por categoria. Selecione uma aba e use os filtros para ordenar ou filtrar os pedidos.
       </Typography>
@@ -390,6 +533,135 @@ function OrdersPage() {
           </FormControl>
         </Box>
       </Paper>
+
+      <Fab
+        color="primary"
+        variant="extended"
+        aria-label="Novo pedido"
+        onClick={handleOpenCreateDialog}
+        sx={{
+          display: { xs: 'flex', sm: 'none' },
+          position: 'fixed',
+          right: 16,
+          bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+          zIndex: (theme) => theme.zIndex.fab,
+          borderRadius: 99,
+          px: 2,
+          boxShadow: 4,
+        }}
+      >
+        <AddIcon sx={{ mr: 0.75 }} />
+        Novo pedido
+      </Fab>
+
+      <Dialog open={isCreateDialogOpen} onClose={handleCloseCreateDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Novo pedido</DialogTitle>
+        <DialogContent dividers>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gap: 2,
+              mt: 0.5,
+            }}
+          >
+            <TextField
+              label="ID do pedido"
+              size="small"
+              value={newOrderForm.id}
+              onChange={(e) => handleNewOrderFieldChange('id', e.target.value)}
+              helperText="Se vazio, um ID automático será gerado."
+              fullWidth
+            />
+            <TextField
+              label="Cliente *"
+              size="small"
+              value={newOrderForm.customerName}
+              onChange={(e) => handleNewOrderFieldChange('customerName', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Modelo *"
+              size="small"
+              value={newOrderForm.model}
+              onChange={(e) => handleNewOrderFieldChange('model', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Tamanho"
+              size="small"
+              value={newOrderForm.size}
+              onChange={(e) => handleNewOrderFieldChange('size', e.target.value)}
+              fullWidth
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel id="new-order-category-label">Categoria</InputLabel>
+              <Select
+                labelId="new-order-category-label"
+                label="Categoria"
+                value={newOrderForm.category}
+                onChange={(e) => handleNewOrderFieldChange('category', e.target.value as OrderCategory)}
+              >
+                {ORDER_CATEGORIES.map((categoryOption) => (
+                  <MenuItem key={categoryOption} value={categoryOption}>
+                    {categoryOption}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="new-order-status-label">Status</InputLabel>
+              <Select
+                labelId="new-order-status-label"
+                label="Status"
+                value={newOrderForm.status}
+                onChange={(e) => handleNewOrderFieldChange('status', e.target.value as OrderStatus)}
+              >
+                {ORDER_STATUSES.map((statusOption) => (
+                  <MenuItem key={statusOption} value={statusOption}>
+                    {statusOption}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Data de entrega *"
+              type="date"
+              size="small"
+              value={newOrderForm.deliveryDate}
+              onChange={(e) => handleNewOrderFieldChange('deliveryDate', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              label="Material"
+              size="small"
+              value={newOrderForm.fabric}
+              onChange={(e) => handleNewOrderFieldChange('fabric', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Tipo de esponja"
+              size="small"
+              value={newOrderForm.foam}
+              onChange={(e) => handleNewOrderFieldChange('foam', e.target.value)}
+              fullWidth
+              sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }}
+            />
+          </Box>
+          {createOrderError ? (
+            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+              {createOrderError}
+            </Typography>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseCreateDialog}>Cancelar</Button>
+          <Button variant="contained" onClick={handleCreateOrder}>
+            Salvar pedido
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <OrdersTable rows={filteredList} />
     </Box>
