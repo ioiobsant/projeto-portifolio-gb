@@ -37,6 +37,7 @@ export interface OrderItem {
   id: string
   category: OrderCategory
   model: string
+  productImageUrl?: string
   size?: string
   customer: OrderCustomer
   specs: OrderSpecs

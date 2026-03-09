@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type ChangeEvent } from 'react'
 import Box from '@mui/material/Box'
 import Collapse from '@mui/material/Collapse'
 import Typography from '@mui/material/Typography'
@@ -34,6 +34,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
+import UploadFileIcon from '@mui/icons-material/UploadFile'
 import WeekendIcon from '@mui/icons-material/Weekend'
 import BedIcon from '@mui/icons-material/Bed'
 import ChairIcon from '@mui/icons-material/Chair'
@@ -60,6 +61,8 @@ const statusColors: Record<OrderStatus, 'default' | 'warning' | 'success' | 'inf
   Entregue: 'info',
 }
 
+const ORDER_IMAGE_FALLBACK = '/genice-brandao-atelier-logo.png'
+
 const SORT_OPTIONS = [
   { value: 'createdAt', label: 'Data do pedido' },
   { value: 'customer', label: 'Cliente' },
@@ -75,6 +78,7 @@ interface NewOrderForm {
   customerName: string
   category: OrderCategory
   model: string
+  productImageUrl: string
   size: string
   deliveryDate: string
   status: OrderStatus
@@ -109,6 +113,7 @@ function createInitialOrderForm(orders: OrderItem[]): NewOrderForm {
     customerName: '',
     category: ORDER_CATEGORIES[0],
     model: '',
+    productImageUrl: '',
     size: '',
     deliveryDate: getTodayIsoDate(),
     status: ORDER_STATUSES[0],
@@ -123,6 +128,7 @@ function createOrderFormFromOrder(order: OrderItem): NewOrderForm {
     customerName: order.customer.name,
     category: order.category,
     model: order.model,
+    productImageUrl: order.productImageUrl ?? '',
     size: order.size ?? '',
     deliveryDate: order.deliveryDate,
     status: order.status,
@@ -183,6 +189,123 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
     },
   }
 
+  const renderExpandedDetails = (row: OrderWithDisplay) => (
+    <Box
+      sx={{
+        px: { xs: 1, sm: 1.5 },
+        pb: 1.5,
+        pt: 0.5,
+        display: 'grid',
+        gap: 1.25,
+      }}
+    >
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'minmax(200px, 240px) 1fr',
+            md: 'minmax(240px, 300px) 1fr',
+          },
+          gap: { xs: 1.25, md: 1.75 },
+          bgcolor: '#fafafa',
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 2,
+          p: 1.25,
+        }}
+      >
+        <Box sx={{ display: 'grid', gap: 0.75 }}>
+          <Typography variant="caption" color="text.secondary">
+            Imagem do produto
+          </Typography>
+          <Box
+            sx={{
+              borderRadius: 2,
+              border: 1,
+              borderColor: 'divider',
+              bgcolor: '#f0f0f0',
+              overflow: 'hidden',
+              aspectRatio: '4 / 3',
+            }}
+          >
+            <Box
+              component="img"
+              src={row.productImageUrl ?? ORDER_IMAGE_FALLBACK}
+              alt={`Produto ${row.model}`}
+              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </Box>
+        </Box>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(180px, 260px))' },
+            rowGap: 1,
+            columnGap: { xs: 1, md: 1.5 },
+            justifyContent: 'start',
+          }}
+        >
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Categoria
+            </Typography>
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {categoryIcons[row.category]}
+              {row.category}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Modelo
+            </Typography>
+            <Typography variant="body2">{row.size ? `${row.model} (${row.size})` : row.model}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Material
+            </Typography>
+            <Typography variant="body2">{row.specs.fabric ?? 'Não informado'}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Tipo de esponja
+            </Typography>
+            <Typography variant="body2">{row.specs.foam ?? 'Não informado'}</Typography>
+          </Box>
+        </Box>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        <Tooltip title="Editar pedido">
+          <IconButton
+            size="small"
+            aria-label="Editar pedido"
+            onClick={(event) => {
+              event.stopPropagation()
+              onEditOrder(row)
+            }}
+            sx={actionButtonSx}
+          >
+            <EditOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Remover pedido">
+          <IconButton
+            size="small"
+            aria-label="Remover pedido"
+            onClick={(event) => {
+              event.stopPropagation()
+              onRemoveOrder(row)
+            }}
+            sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}
+          >
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+    </Box>
+  )
+
   return (
     <TableContainer
       component={Paper}
@@ -205,10 +328,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
             {!isCompact ? (
               <>
                 <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  Categoria
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  Modelo
+                  Produto
                 </TableCell>
                 <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
                   Data de Entrega
@@ -235,7 +355,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={isCompact ? 4 : 7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+              <TableCell colSpan={isCompact ? 4 : 6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                 Nenhum pedido encontrado com os filtros selecionados.
               </TableCell>
             </TableRow>
@@ -246,34 +366,54 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
               if (!isCompact) {
                 return (
                   <TableRow key={row.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                    <TableCell sx={{ fontFamily: 'monospace', py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                      {row.id}
-                    </TableCell>
-                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                      {row.customer.name}
-                    </TableCell>
-                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        {categoryIcons[row.category]}
-                        {row.category}
+                    <TableCell sx={{ fontFamily: 'monospace', py: 1.25, fontSize: '0.8rem' }}>{row.id}</TableCell>
+                    <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.customer.name}</TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                        <Box
+                          component="img"
+                          src={row.productImageUrl ?? ORDER_IMAGE_FALLBACK}
+                          alt={`Produto ${row.model}`}
+                          sx={{
+                            width: { md: 88, lg: 96 },
+                            height: { md: 66, lg: 72 },
+                            objectFit: 'cover',
+                            borderRadius: 1.5,
+                            border: 1,
+                            borderColor: 'divider',
+                            bgcolor: '#f0f0f0',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <Box sx={{ display: 'grid', gap: 0.25, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {row.size ? `${row.model} (${row.size})` : row.model}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                          >
+                            {categoryIcons[row.category]}
+                            {row.category}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Material: {row.specs.fabric ?? 'Não informado'}
+                          </Typography>
+                        </Box>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                      {row.size ? `${row.model} (${row.size})` : row.model}
-                    </TableCell>
-                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                      {row.deliveryDateDisplay}
-                    </TableCell>
-                    <TableCell sx={{ py: { xs: 1, sm: 1.5 } }}>
+                    <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.deliveryDateDisplay}</TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
                       <Chip
                         label={row.status}
                         color={statusColors[row.status]}
                         size="small"
-                        sx={{ fontWeight: 500, borderRadius: 2, fontSize: { xs: '0.7rem', sm: '0.8125rem' } }}
+                        sx={{ fontWeight: 500, borderRadius: 2, fontSize: '0.8125rem' }}
                       />
                     </TableCell>
-                    <TableCell sx={{ py: { xs: 1, sm: 1.5 } }}>
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                         <Tooltip title="Editar pedido">
                           <IconButton
                             size="small"
@@ -317,6 +457,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
                     sx={{
                       cursor: 'pointer',
                       '& > *': { borderBottom: isExpanded ? 0 : undefined },
+                      '&:last-child td, &:last-child th': { border: 0 },
                     }}
                   >
                     <TableCell sx={{ py: 1.25 }}>
@@ -348,97 +489,19 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
                       align="right"
                       sx={{ py: 0.75, pr: 1, width: 72, whiteSpace: 'nowrap', verticalAlign: 'middle' }}
                     >
-                      {isExpanded ? (
-                        <KeyboardArrowUpIcon
-                          sx={{ fontSize: '1rem', color: 'text.disabled', display: 'block', ml: 'auto' }}
-                        />
-                      ) : (
-                        <KeyboardArrowDownIcon
-                          sx={{ fontSize: '1rem', color: 'text.disabled', display: 'block', ml: 'auto' }}
-                        />
-                      )}
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        {isExpanded ? (
+                          <KeyboardArrowUpIcon sx={{ fontSize: '1rem', color: 'text.disabled' }} />
+                        ) : (
+                          <KeyboardArrowDownIcon sx={{ fontSize: '1rem', color: 'text.disabled' }} />
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell colSpan={4} sx={{ py: 0 }}>
                       <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                        <Box
-                          sx={{
-                            px: 1,
-                            pb: 1.5,
-                            display: 'grid',
-                            gap: 1.25,
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              display: 'grid',
-                              gridTemplateColumns: '1fr 1fr',
-                              gap: 1,
-                              bgcolor: '#fafafa',
-                              border: 1,
-                              borderColor: 'divider',
-                              borderRadius: 2,
-                              p: 1.25,
-                            }}
-                          >
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Categoria
-                              </Typography>
-                              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                {categoryIcons[row.category]}
-                                {row.category}
-                              </Typography>
-                            </Box>
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Modelo
-                              </Typography>
-                              <Typography variant="body2">{row.size ? `${row.model} (${row.size})` : row.model}</Typography>
-                            </Box>
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Material
-                              </Typography>
-                              <Typography variant="body2">{row.specs.fabric ?? 'Não informado'}</Typography>
-                            </Box>
-                            <Box>
-                              <Typography variant="caption" color="text.secondary">
-                                Tipo de esponja
-                              </Typography>
-                              <Typography variant="body2">{row.specs.foam ?? 'Não informado'}</Typography>
-                            </Box>
-                          </Box>
-                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                            <Tooltip title="Editar pedido">
-                              <IconButton
-                                size="small"
-                                aria-label="Editar pedido"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  onEditOrder(row)
-                                }}
-                                sx={actionButtonSx}
-                              >
-                                <EditOutlinedIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Remover pedido">
-                              <IconButton
-                                size="small"
-                                aria-label="Remover pedido"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  onRemoveOrder(row)
-                                }}
-                                sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}
-                              >
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        </Box>
+                        {renderExpandedDetails(row)}
                       </Collapse>
                     </TableCell>
                   </TableRow>
@@ -471,6 +534,7 @@ function OrdersPage() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
   const [editOrderError, setEditOrderError] = useState<string>('')
   const [editOrderForm, setEditOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm(mockOrders))
+  const [editImageFileName, setEditImageFileName] = useState<string>('')
   const [orderPendingDelete, setOrderPendingDelete] = useState<OrderWithDisplay | null>(null)
 
   const category = categories[tab]
@@ -556,6 +620,7 @@ function OrdersPage() {
       id: generatedId,
       category: newOrderForm.category,
       model: newOrderForm.model.trim(),
+      productImageUrl: newOrderForm.productImageUrl.trim() || undefined,
       size: newOrderForm.size.trim() || undefined,
       customer: {
         name: newOrderForm.customerName.trim(),
@@ -591,6 +656,7 @@ function OrdersPage() {
     setEditingOrderId(order.id)
     setEditOrderError('')
     setEditOrderForm(createOrderFormFromOrder(order))
+    setEditImageFileName('')
     setIsEditDialogOpen(true)
   }
 
@@ -598,10 +664,32 @@ function OrdersPage() {
     setIsEditDialogOpen(false)
     setEditingOrderId(null)
     setEditOrderError('')
+    setEditImageFileName('')
   }
 
   const handleEditOrderFieldChange = <K extends keyof NewOrderForm,>(field: K, value: NewOrderForm[K]) => {
     setEditOrderForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleEditImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        return
+      }
+
+      setEditOrderForm((prev) => ({ ...prev, productImageUrl: reader.result as string }))
+      setEditImageFileName(file.name)
+    }
+    reader.readAsDataURL(file)
+
+    // Allows selecting the same file again if needed.
+    event.target.value = ''
   }
 
   const handleEditOrder = () => {
@@ -636,6 +724,7 @@ function OrdersPage() {
           id: normalizedId,
           category: editOrderForm.category,
           model: editOrderForm.model.trim(),
+          productImageUrl: editOrderForm.productImageUrl.trim() || undefined,
           size: editOrderForm.size.trim() || undefined,
           customer: {
             ...order.customer,
@@ -710,7 +799,7 @@ function OrdersPage() {
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Listagem por categoria. Selecione uma aba e use os filtros para ordenar ou filtrar os pedidos.
-        Em telas pequenas, toque no pedido para abrir os detalhes e os botões de ação.
+        No desktop, a imagem do produto já aparece na linha do pedido. Em telas pequenas, toque no pedido para abrir os detalhes e ações.
       </Typography>
 
       <Tabs
@@ -1102,6 +1191,50 @@ function OrdersPage() {
               fullWidth
               sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }}
             />
+            <Box
+              sx={{
+                gridColumn: { xs: 'auto', sm: 'span 2' },
+                display: 'grid',
+                gap: 1,
+                p: 1.25,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 2,
+                bgcolor: '#fafafa',
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600}>
+                Imagem do produto
+              </Typography>
+              <Box
+                sx={{
+                  width: '100%',
+                  maxWidth: { xs: '100%', sm: 280 },
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  bgcolor: '#f0f0f0',
+                  aspectRatio: '4 / 3',
+                }}
+              >
+                <Box
+                  component="img"
+                  src={editOrderForm.productImageUrl || ORDER_IMAGE_FALLBACK}
+                  alt={`Pré-visualização do produto ${editOrderForm.model || ''}`}
+                  sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </Box>
+              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} sx={{ width: 'fit-content' }}>
+                Fazer upload da imagem
+                <input hidden type="file" accept="image/*" onChange={handleEditImageUpload} />
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                {editImageFileName
+                  ? `Arquivo selecionado: ${editImageFileName}`
+                  : 'Campo visual de upload disponível para mostrar que a troca de imagem é possível no front-end.'}
+              </Typography>
+            </Box>
           </Box>
           {editOrderError ? (
             <Typography variant="body2" color="error" sx={{ mt: 2 }}>

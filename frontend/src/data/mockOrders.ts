@@ -12,6 +12,7 @@ export const mockOrders: OrderItem[] = [
     id: 'GBA-2023-0101',
     category: 'Sofá',
     model: 'Chesterfield Imperial',
+    productImageUrl: '/genice-brandao-atelier-logo.png',
     size: '3 Lugares (2.40m)',
     customer: {
       name: 'Juliana Costa',
@@ -35,6 +36,7 @@ export const mockOrders: OrderItem[] = [
     id: 'GBA-2023-0102',
     category: 'Cama',
     model: 'Paris',
+    productImageUrl: '/genice-brandao-atelier-logo.png',
     size: 'King Size',
     customer: {
       name: 'Marcos Almeida',
@@ -60,6 +62,7 @@ export const mockOrders: OrderItem[] = [
     id: 'GBA-2023-0103',
     category: 'Poltrona',
     model: 'Duda',
+    productImageUrl: '/genice-brandao-atelier-logo.png',
     size: 'Padrão',
     customer: {
       name: 'Camila Fernandes',
@@ -83,6 +86,7 @@ export const mockOrders: OrderItem[] = [
     id: 'GBA-2023-0104',
     category: 'Cadeira de Jantar',
     model: 'Elegance',
+    productImageUrl: '/genice-brandao-atelier-logo.png',
     size: 'Conjunto de 8',
     customer: {
       name: 'Arquitetura & Design (Roberto)',
@@ -108,6 +112,7 @@ export const mockOrders: OrderItem[] = [
     id: 'GBA-2023-0105',
     category: 'Cabeceira',
     model: 'Estofada Modular',
+    productImageUrl: '/genice-brandao-atelier-logo.png',
     size: 'Sob Medida (3.00m x 1.20m)',
     customer: {
       name: 'Sandra Nogueira',
