@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import Box from '@mui/material/Box'
+import Collapse from '@mui/material/Collapse'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
 import Table from '@mui/material/Table'
@@ -13,6 +14,8 @@ import Tabs from '@mui/material/Tabs'
 import Tab from '@mui/material/Tab'
 import Button from '@mui/material/Button'
 import Fab from '@mui/material/Fab'
+import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
@@ -23,8 +26,14 @@ import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import TextField from '@mui/material/TextField'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
 import WeekendIcon from '@mui/icons-material/Weekend'
 import BedIcon from '@mui/icons-material/Bed'
 import ChairIcon from '@mui/icons-material/Chair'
@@ -108,6 +117,20 @@ function createInitialOrderForm(orders: OrderItem[]): NewOrderForm {
   }
 }
 
+function createOrderFormFromOrder(order: OrderItem): NewOrderForm {
+  return {
+    id: order.id,
+    customerName: order.customer.name,
+    category: order.category,
+    model: order.model,
+    size: order.size ?? '',
+    deliveryDate: order.deliveryDate,
+    status: order.status,
+    fabric: order.specs.fabric ?? '',
+    foam: order.specs.foam ?? '',
+  }
+}
+
 function compareOrders(
   a: OrderWithDisplay,
   b: OrderWithDisplay,
@@ -133,7 +156,33 @@ function compareByStatus(a: OrderWithDisplay, b: OrderWithDisplay, order: 'asc' 
   return order === 'asc' ? indexA - indexB : indexB - indexA
 }
 
-function OrdersTable({ rows }: { rows: OrderWithDisplay[] }) {
+interface OrdersTableProps {
+  rows: OrderWithDisplay[]
+  onEditOrder: (order: OrderWithDisplay) => void
+  onRemoveOrder: (order: OrderWithDisplay) => void
+}
+
+function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
+  const theme = useTheme()
+  const isCompact = useMediaQuery(theme.breakpoints.down('sm'))
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+
+  const toggleRow = (id: string) => {
+    setExpandedRowId((previous) => (previous === id ? null : id))
+  }
+
+  const actionButtonSx = {
+    border: 1,
+    borderColor: 'divider',
+    borderRadius: 1.75,
+    width: 32,
+    height: 32,
+    '&:hover': {
+      borderColor: 'text.secondary',
+      bgcolor: 'action.hover',
+    },
+  }
+
   return (
     <TableContainer
       component={Paper}
@@ -141,70 +190,261 @@ function OrdersTable({ rows }: { rows: OrderWithDisplay[] }) {
       sx={{
         borderRadius: 3,
         overflowX: 'auto',
-        '-webkit-overflow-scrolling': 'touch',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
-      <Table size="medium" sx={{ minWidth: 640 }}>
+      <Table size="medium" sx={{ minWidth: { xs: 0, md: 880 } }}>
         <TableHead>
           <TableRow sx={{ bgcolor: '#fafafa' }}>
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-              ID
+              Pedido
             </TableCell>
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Cliente
             </TableCell>
-            <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-              Categoria
-            </TableCell>
-            <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-              Modelo
-            </TableCell>
-            <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-              Data de Entrega
-            </TableCell>
+            {!isCompact ? (
+              <>
+                <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                  Categoria
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                  Modelo
+                </TableCell>
+                <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                  Data de Entrega
+                </TableCell>
+              </>
+            ) : null}
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Status
+            </TableCell>
+            <TableCell
+              align="right"
+              sx={{
+                fontWeight: 600,
+                py: { xs: 1, sm: 1.5 },
+                fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                width: { xs: 72, sm: 'auto' },
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isCompact ? 'Abrir' : 'Ações'}
             </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+              <TableCell colSpan={isCompact ? 4 : 7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                 Nenhum pedido encontrado com os filtros selecionados.
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row) => (
-              <TableRow key={row.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                <TableCell sx={{ fontFamily: 'monospace', py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
-                  {row.id}
-                </TableCell>
-                <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  {row.customer.name}
-                </TableCell>
-                <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    {categoryIcons[row.category]}
-                    {row.category}
-                  </Box>
-                </TableCell>
-                <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  {row.size ? `${row.model} (${row.size})` : row.model}
-                </TableCell>
-                <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  {row.deliveryDateDisplay}
-                </TableCell>
-                <TableCell sx={{ py: { xs: 1, sm: 1.5 } }}>
-                  <Chip
-                    label={row.status}
-                    color={statusColors[row.status]}
-                    size="small"
-                    sx={{ fontWeight: 500, borderRadius: 2, fontSize: { xs: '0.7rem', sm: '0.8125rem' } }}
-                  />
-                </TableCell>
-              </TableRow>
-            ))
+            rows.map((row) => {
+              const isExpanded = expandedRowId === row.id
+
+              if (!isCompact) {
+                return (
+                  <TableRow key={row.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                    <TableCell sx={{ fontFamily: 'monospace', py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                      {row.id}
+                    </TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                      {row.customer.name}
+                    </TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {categoryIcons[row.category]}
+                        {row.category}
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                      {row.size ? `${row.model} (${row.size})` : row.model}
+                    </TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                      {row.deliveryDateDisplay}
+                    </TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 } }}>
+                      <Chip
+                        label={row.status}
+                        color={statusColors[row.status]}
+                        size="small"
+                        sx={{ fontWeight: 500, borderRadius: 2, fontSize: { xs: '0.7rem', sm: '0.8125rem' } }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 } }}>
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <Tooltip title="Editar pedido">
+                          <IconButton
+                            size="small"
+                            aria-label="Editar pedido"
+                            onClick={() => onEditOrder(row)}
+                            sx={actionButtonSx}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Remover pedido">
+                          <IconButton
+                            size="small"
+                            aria-label="Remover pedido"
+                            onClick={() => onRemoveOrder(row)}
+                            sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )
+              }
+
+              return (
+                <Fragment key={row.id}>
+                  <TableRow
+                    hover
+                    onClick={() => toggleRow(row.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        toggleRow(row.id)
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    sx={{
+                      cursor: 'pointer',
+                      '& > *': { borderBottom: isExpanded ? 0 : undefined },
+                    }}
+                  >
+                    <TableCell sx={{ py: 1.25 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: 'block',
+                          color: 'text.secondary',
+                          fontFamily: 'monospace',
+                          fontSize: '0.72rem',
+                        }}
+                      >
+                        {row.id}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
+                        Entrega: {row.deliveryDateDisplay}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.25, fontSize: '0.8rem' }}>{row.customer.name}</TableCell>
+                    <TableCell sx={{ py: 1.25 }}>
+                      <Chip
+                        label={row.status}
+                        color={statusColors[row.status]}
+                        size="small"
+                        sx={{ fontWeight: 500, borderRadius: 2, fontSize: '0.7rem' }}
+                      />
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ py: 0.75, pr: 1, width: 72, whiteSpace: 'nowrap', verticalAlign: 'middle' }}
+                    >
+                      {isExpanded ? (
+                        <KeyboardArrowUpIcon
+                          sx={{ fontSize: '1rem', color: 'text.disabled', display: 'block', ml: 'auto' }}
+                        />
+                      ) : (
+                        <KeyboardArrowDownIcon
+                          sx={{ fontSize: '1rem', color: 'text.disabled', display: 'block', ml: 'auto' }}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={4} sx={{ py: 0 }}>
+                      <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                        <Box
+                          sx={{
+                            px: 1,
+                            pb: 1.5,
+                            display: 'grid',
+                            gap: 1.25,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: 1,
+                              bgcolor: '#fafafa',
+                              border: 1,
+                              borderColor: 'divider',
+                              borderRadius: 2,
+                              p: 1.25,
+                            }}
+                          >
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">
+                                Categoria
+                              </Typography>
+                              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {categoryIcons[row.category]}
+                                {row.category}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">
+                                Modelo
+                              </Typography>
+                              <Typography variant="body2">{row.size ? `${row.model} (${row.size})` : row.model}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">
+                                Material
+                              </Typography>
+                              <Typography variant="body2">{row.specs.fabric ?? 'Não informado'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">
+                                Tipo de esponja
+                              </Typography>
+                              <Typography variant="body2">{row.specs.foam ?? 'Não informado'}</Typography>
+                            </Box>
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                            <Tooltip title="Editar pedido">
+                              <IconButton
+                                size="small"
+                                aria-label="Editar pedido"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onEditOrder(row)
+                                }}
+                                sx={actionButtonSx}
+                              >
+                                <EditOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Remover pedido">
+                              <IconButton
+                                size="small"
+                                aria-label="Remover pedido"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onRemoveOrder(row)
+                                }}
+                                sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </Fragment>
+              )
+            })
           )}
         </TableBody>
       </Table>
@@ -227,6 +467,11 @@ function OrdersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false)
   const [createOrderError, setCreateOrderError] = useState<string>('')
   const [newOrderForm, setNewOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm(mockOrders))
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false)
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
+  const [editOrderError, setEditOrderError] = useState<string>('')
+  const [editOrderForm, setEditOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm(mockOrders))
+  const [orderPendingDelete, setOrderPendingDelete] = useState<OrderWithDisplay | null>(null)
 
   const category = categories[tab]
 
@@ -342,6 +587,93 @@ function OrdersPage() {
     setIsCreateDialogOpen(false)
   }
 
+  const handleOpenEditDialog = (order: OrderWithDisplay) => {
+    setEditingOrderId(order.id)
+    setEditOrderError('')
+    setEditOrderForm(createOrderFormFromOrder(order))
+    setIsEditDialogOpen(true)
+  }
+
+  const handleCloseEditDialog = () => {
+    setIsEditDialogOpen(false)
+    setEditingOrderId(null)
+    setEditOrderError('')
+  }
+
+  const handleEditOrderFieldChange = <K extends keyof NewOrderForm,>(field: K, value: NewOrderForm[K]) => {
+    setEditOrderForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleEditOrder = () => {
+    if (!editingOrderId) {
+      return
+    }
+
+    const normalizedId = editOrderForm.id.trim().toUpperCase()
+
+    if (!normalizedId || !editOrderForm.customerName.trim() || !editOrderForm.model.trim() || !editOrderForm.deliveryDate) {
+      setEditOrderError('Preencha os campos obrigatórios: ID, cliente, modelo e data de entrega.')
+      return
+    }
+
+    if (
+      orders.some(
+        (order) => order.id.toUpperCase() === normalizedId && order.id.toUpperCase() !== editingOrderId.toUpperCase()
+      )
+    ) {
+      setEditOrderError('Já existe um pedido com esse ID. Informe outro identificador.')
+      return
+    }
+
+    setOrders((prev) =>
+      prev.map((order) => {
+        if (order.id !== editingOrderId) {
+          return order
+        }
+
+        return {
+          ...order,
+          id: normalizedId,
+          category: editOrderForm.category,
+          model: editOrderForm.model.trim(),
+          size: editOrderForm.size.trim() || undefined,
+          customer: {
+            ...order.customer,
+            name: editOrderForm.customerName.trim(),
+          },
+          specs: {
+            ...order.specs,
+            fabric: editOrderForm.fabric.trim() || undefined,
+            foam: editOrderForm.foam.trim() || undefined,
+          },
+          deliveryDate: editOrderForm.deliveryDate,
+          status: editOrderForm.status,
+        }
+      })
+    )
+
+    setIsEditDialogOpen(false)
+    setEditingOrderId(null)
+    setEditOrderError('')
+  }
+
+  const handleOpenRemoveDialog = (order: OrderWithDisplay) => {
+    setOrderPendingDelete(order)
+  }
+
+  const handleCloseRemoveDialog = () => {
+    setOrderPendingDelete(null)
+  }
+
+  const handleRemoveOrder = () => {
+    if (!orderPendingDelete) {
+      return
+    }
+
+    setOrders((prev) => prev.filter((order) => order.id !== orderPendingDelete.id))
+    setOrderPendingDelete(null)
+  }
+
   return (
     <Box sx={{ maxWidth: '100%', overflow: 'hidden', pb: { xs: 10, sm: 0 } }}>
       <Box
@@ -378,6 +710,7 @@ function OrdersPage() {
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Listagem por categoria. Selecione uma aba e use os filtros para ordenar ou filtrar os pedidos.
+        Em telas pequenas, toque no pedido para abrir os detalhes e os botões de ação.
       </Typography>
 
       <Tabs
@@ -396,6 +729,19 @@ function OrdersPage() {
           borderColor: 'divider',
           mb: 2,
           minHeight: 48,
+          touchAction: 'pan-x',
+          '& .MuiTabs-scroller': {
+            overflowX: 'auto !important',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          },
+          '& .MuiTabs-scroller::-webkit-scrollbar': {
+            display: 'none',
+          },
+          '& .MuiTabs-flexContainer': {
+            flexWrap: 'nowrap',
+          },
           '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 600 },
         }}
       >
@@ -663,7 +1009,132 @@ function OrdersPage() {
         </DialogActions>
       </Dialog>
 
-      <OrdersTable rows={filteredList} />
+      <Dialog open={isEditDialogOpen} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Editar pedido</DialogTitle>
+        <DialogContent dividers>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gap: 2,
+              mt: 0.5,
+            }}
+          >
+            <TextField
+              label="ID do pedido *"
+              size="small"
+              value={editOrderForm.id}
+              onChange={(e) => handleEditOrderFieldChange('id', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Cliente *"
+              size="small"
+              value={editOrderForm.customerName}
+              onChange={(e) => handleEditOrderFieldChange('customerName', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Modelo *"
+              size="small"
+              value={editOrderForm.model}
+              onChange={(e) => handleEditOrderFieldChange('model', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Tamanho"
+              size="small"
+              value={editOrderForm.size}
+              onChange={(e) => handleEditOrderFieldChange('size', e.target.value)}
+              fullWidth
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel id="edit-order-category-label">Categoria</InputLabel>
+              <Select
+                labelId="edit-order-category-label"
+                label="Categoria"
+                value={editOrderForm.category}
+                onChange={(e) => handleEditOrderFieldChange('category', e.target.value as OrderCategory)}
+              >
+                {ORDER_CATEGORIES.map((categoryOption) => (
+                  <MenuItem key={categoryOption} value={categoryOption}>
+                    {categoryOption}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="edit-order-status-label">Status</InputLabel>
+              <Select
+                labelId="edit-order-status-label"
+                label="Status"
+                value={editOrderForm.status}
+                onChange={(e) => handleEditOrderFieldChange('status', e.target.value as OrderStatus)}
+              >
+                {ORDER_STATUSES.map((statusOption) => (
+                  <MenuItem key={statusOption} value={statusOption}>
+                    {statusOption}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Data de entrega *"
+              type="date"
+              size="small"
+              value={editOrderForm.deliveryDate}
+              onChange={(e) => handleEditOrderFieldChange('deliveryDate', e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              label="Material"
+              size="small"
+              value={editOrderForm.fabric}
+              onChange={(e) => handleEditOrderFieldChange('fabric', e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label="Tipo de esponja"
+              size="small"
+              value={editOrderForm.foam}
+              onChange={(e) => handleEditOrderFieldChange('foam', e.target.value)}
+              fullWidth
+              sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }}
+            />
+          </Box>
+          {editOrderError ? (
+            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+              {editOrderError}
+            </Typography>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog}>Cancelar</Button>
+          <Button variant="contained" onClick={handleEditOrder}>
+            Salvar alterações
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(orderPendingDelete)} onClose={handleCloseRemoveDialog} fullWidth maxWidth="xs">
+        <DialogTitle>Remover pedido</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary">
+            {orderPendingDelete
+              ? `Confirma a remoção do pedido ${orderPendingDelete.id} de ${orderPendingDelete.customer.name}?`
+              : 'Confirma a remoção do pedido selecionado?'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseRemoveDialog}>Cancelar</Button>
+          <Button variant="contained" color="error" onClick={handleRemoveOrder}>
+            Remover pedido
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <OrdersTable rows={filteredList} onEditOrder={handleOpenEditDialog} onRemoveOrder={handleOpenRemoveDialog} />
     </Box>
   )
 }
