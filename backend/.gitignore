@@ -1,6 +1,8 @@
 # Node/TypeScript backend
 node_modules/
 dist/
+prisma/*.sqlite
+prisma/*.sqlite-journal
 build/
 coverage/
 
