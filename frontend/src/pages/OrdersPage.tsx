@@ -1,8 +1,10 @@
-import { Fragment, useMemo, useState, type ChangeEvent } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
 import Collapse from '@mui/material/Collapse'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
+import Alert from '@mui/material/Alert'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -42,7 +44,8 @@ import DinnerDiningIcon from '@mui/icons-material/DinnerDining'
 import KingBedIcon from '@mui/icons-material/KingBed'
 import { ORDER_CATEGORIES, ORDER_STATUSES } from '../types/order'
 import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
-import { mockOrders, getOrdersWithDisplayDates } from '../data/mockOrders'
+import { getOrdersWithDisplayDates } from '../data/mockOrders'
+import * as ordersApi from '../api/orders'
 
 type OrderWithDisplay = ReturnType<typeof getOrdersWithDisplayDates>[number]
 
@@ -518,7 +521,9 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
 const categories = ['Todos', ...ORDER_CATEGORIES] as const
 
 function OrdersPage() {
-  const [orders, setOrders] = useState<OrderItem[]>(() => [...mockOrders])
+  const [orders, setOrders] = useState<OrderItem[]>([])
+  const [ordersLoading, setOrdersLoading] = useState<boolean>(true)
+  const [ordersError, setOrdersError] = useState<string>('')
   const ordersWithDisplay = useMemo(() => getOrdersWithDisplayDates(orders), [orders])
   const [tab, setTab] = useState<number>(0)
   const [sortBy, setSortBy] = useState<SortBy>('createdAt')
@@ -529,13 +534,30 @@ function OrdersPage() {
   const [filterFoam, setFilterFoam] = useState<string>('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false)
   const [createOrderError, setCreateOrderError] = useState<string>('')
-  const [newOrderForm, setNewOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm(mockOrders))
+  const [newOrderForm, setNewOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm([]))
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
   const [editOrderError, setEditOrderError] = useState<string>('')
-  const [editOrderForm, setEditOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm(mockOrders))
+  const [editOrderForm, setEditOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm([]))
   const [editImageFileName, setEditImageFileName] = useState<string>('')
   const [orderPendingDelete, setOrderPendingDelete] = useState<OrderWithDisplay | null>(null)
+
+  const fetchOrders = useCallback(async () => {
+    setOrdersLoading(true)
+    setOrdersError('')
+    try {
+      const data = await ordersApi.getOrders()
+      setOrders(data)
+    } catch (e) {
+      setOrdersError(e instanceof Error ? e.message : 'Erro ao carregar pedidos.')
+    } finally {
+      setOrdersLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchOrders()
+  }, [fetchOrders])
 
   const category = categories[tab]
 
@@ -604,7 +626,7 @@ function OrdersPage() {
     setNewOrderForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     const generatedId = (newOrderForm.id.trim() || generateNextOrderId(orders)).toUpperCase()
     if (!newOrderForm.customerName.trim() || !newOrderForm.model.trim() || !newOrderForm.deliveryDate) {
       setCreateOrderError('Preencha os campos obrigatórios: cliente, modelo e data de entrega.')
@@ -640,16 +662,21 @@ function OrdersPage() {
       createdAt: getTodayIsoDate(),
     }
 
-    setOrders((prev) => [orderToInsert, ...prev])
-    setTab(0)
-    setSearchId('')
-    setFilterStatus('')
-    setFilterMaterial('')
-    setFilterFoam('')
-    setSortBy('createdAt')
-    setSortOrder('desc')
     setCreateOrderError('')
-    setIsCreateDialogOpen(false)
+    try {
+      const created = await ordersApi.createOrder(orderToInsert)
+      setOrders((prev) => [created, ...prev])
+      setTab(0)
+      setSearchId('')
+      setFilterStatus('')
+      setFilterMaterial('')
+      setFilterFoam('')
+      setSortBy('createdAt')
+      setSortOrder('desc')
+      setIsCreateDialogOpen(false)
+    } catch (e) {
+      setCreateOrderError(e instanceof Error ? e.message : 'Erro ao criar pedido.')
+    }
   }
 
   const handleOpenEditDialog = (order: OrderWithDisplay) => {
@@ -692,7 +719,7 @@ function OrdersPage() {
     event.target.value = ''
   }
 
-  const handleEditOrder = () => {
+  const handleEditOrder = async () => {
     if (!editingOrderId) {
       return
     }
@@ -713,37 +740,40 @@ function OrdersPage() {
       return
     }
 
-    setOrders((prev) =>
-      prev.map((order) => {
-        if (order.id !== editingOrderId) {
-          return order
-        }
+    const current = orders.find((o) => o.id === editingOrderId)
+    if (!current) return
 
-        return {
-          ...order,
-          id: normalizedId,
-          category: editOrderForm.category,
-          model: editOrderForm.model.trim(),
-          productImageUrl: editOrderForm.productImageUrl.trim() || undefined,
-          size: editOrderForm.size.trim() || undefined,
-          customer: {
-            ...order.customer,
-            name: editOrderForm.customerName.trim(),
-          },
-          specs: {
-            ...order.specs,
-            fabric: editOrderForm.fabric.trim() || undefined,
-            foam: editOrderForm.foam.trim() || undefined,
-          },
-          deliveryDate: editOrderForm.deliveryDate,
-          status: editOrderForm.status,
-        }
-      })
-    )
+    const updated: OrderItem = {
+      ...current,
+      id: normalizedId,
+      category: editOrderForm.category,
+      model: editOrderForm.model.trim(),
+      productImageUrl: editOrderForm.productImageUrl.trim() || undefined,
+      size: editOrderForm.size.trim() || undefined,
+      customer: {
+        ...current.customer,
+        name: editOrderForm.customerName.trim(),
+      },
+      specs: {
+        ...current.specs,
+        fabric: editOrderForm.fabric.trim() || undefined,
+        foam: editOrderForm.foam.trim() || undefined,
+      },
+      deliveryDate: editOrderForm.deliveryDate,
+      status: editOrderForm.status,
+    }
 
-    setIsEditDialogOpen(false)
-    setEditingOrderId(null)
     setEditOrderError('')
+    try {
+      const result = await ordersApi.updateOrder(editingOrderId, updated)
+      setOrders((prev) =>
+        prev.map((order) => (order.id === editingOrderId ? result : order))
+      )
+      setIsEditDialogOpen(false)
+      setEditingOrderId(null)
+    } catch (e) {
+      setEditOrderError(e instanceof Error ? e.message : 'Erro ao atualizar pedido.')
+    }
   }
 
   const handleOpenRemoveDialog = (order: OrderWithDisplay) => {
@@ -754,13 +784,18 @@ function OrdersPage() {
     setOrderPendingDelete(null)
   }
 
-  const handleRemoveOrder = () => {
+  const handleRemoveOrder = async () => {
     if (!orderPendingDelete) {
       return
     }
-
-    setOrders((prev) => prev.filter((order) => order.id !== orderPendingDelete.id))
+    const idToRemove = orderPendingDelete.id
     setOrderPendingDelete(null)
+    try {
+      await ordersApi.deleteOrder(idToRemove)
+      setOrders((prev) => prev.filter((order) => order.id !== idToRemove))
+    } catch {
+      setOrderPendingDelete(ordersWithDisplay.find((o) => o.id === idToRemove) ?? null)
+    }
   }
 
   return (
@@ -802,6 +837,18 @@ function OrdersPage() {
         No desktop, a imagem do produto já aparece na linha do pedido. Em telas pequenas, toque no pedido para abrir os detalhes e ações.
       </Typography>
 
+      {ordersError && (
+        <Alert severity="error" onClose={() => setOrdersError('')} sx={{ mb: 2 }}>
+          {ordersError}
+        </Alert>
+      )}
+
+      {ordersLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <>
       <Tabs
         value={tab}
         onChange={(_, v) => {
@@ -1268,6 +1315,8 @@ function OrdersPage() {
       </Dialog>
 
       <OrdersTable rows={filteredList} onEditOrder={handleOpenEditDialog} onRemoveOrder={handleOpenRemoveDialog} />
+        </>
+      )}
     </Box>
   )
 }

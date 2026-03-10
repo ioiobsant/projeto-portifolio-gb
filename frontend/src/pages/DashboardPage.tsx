@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
@@ -9,6 +10,8 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Chip from '@mui/material/Chip'
 import Link from '@mui/material/Link'
+import CircularProgress from '@mui/material/CircularProgress'
+import Alert from '@mui/material/Alert'
 import DescriptionIcon from '@mui/icons-material/Description'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
@@ -18,8 +21,11 @@ import BedIcon from '@mui/icons-material/Bed'
 import ChairIcon from '@mui/icons-material/Chair'
 import DinnerDiningIcon from '@mui/icons-material/DinnerDining'
 import KingBedIcon from '@mui/icons-material/KingBed'
-import { mockDashboardStats, mockOrders, getOrdersWithDisplayDates } from '../data/mockOrders'
-import type { OrderCategory, OrderStatus } from '../types/order'
+import { Link as RouterLink } from 'react-router-dom'
+import { getOrdersWithDisplayDates } from '../data/mockOrders'
+import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
+import type { DashboardStats } from '../types/order'
+import * as ordersApi from '../api/orders'
 
 const categoryIcons: Record<OrderCategory, React.ReactNode> = {
   Sofá: <WeekendIcon fontSize="small" />,
@@ -36,9 +42,61 @@ const statusColors: Record<OrderStatus, 'default' | 'warning' | 'success' | 'inf
   Entregue: 'info',
 }
 
+function computeStatsFromOrders(orders: { status: string; deliveryDate: string }[]): DashboardStats {
+  const now = new Date()
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return {
+    totalOrders: orders.length,
+    inProduction: orders.filter((o) => o.status === 'Em Produção').length,
+    readyForDelivery: orders.filter((o) => o.status === 'Pronto').length,
+    deliveredThisMonth: orders.filter(
+      (o) => o.status === 'Entregue' && o.deliveryDate.startsWith(yearMonth)
+    ).length,
+  }
+}
+
 function DashboardPage() {
-  const stats = mockDashboardStats
-  const ordersWithDisplay = getOrdersWithDisplayDates(mockOrders)
+  const [orders, setOrders] = useState<OrderItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ordersApi
+      .getOrders()
+      .then((data) => {
+        if (!cancelled) setOrders(data)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Erro ao carregar pedidos.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const stats = computeStatsFromOrders(orders)
+  const ordersWithDisplay = getOrdersWithDisplayDates(orders)
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress />
+      </Box>
+    )
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ maxWidth: '100%' }}>
+        <Typography variant="h5" fontWeight={600} sx={{ mb: 2 }}>Dashboard</Typography>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    )
+  }
 
   return (
     <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
@@ -174,7 +232,7 @@ function DashboardPage() {
         <Typography variant="h6" fontWeight={600} color="text.primary" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
           Pedidos Recentes
         </Typography>
-        <Link href="#" underline="hover" variant="body2" sx={{ fontWeight: 500 }}>
+        <Link component={RouterLink} to="/pedidos" underline="hover" variant="body2" sx={{ fontWeight: 500 }}>
           Ver Todos &gt;
         </Link>
       </Box>
