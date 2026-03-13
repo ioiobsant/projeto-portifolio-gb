@@ -54,6 +54,8 @@ import { ORDER_CATEGORIES, ORDER_STATUSES, MANUFACTURE_TYPES } from '../types/or
 import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
 import { getOrdersWithDisplayDates } from '../data/mockOrders'
 import { createInitialOrderForm, createOrderFormFromOrder, type NewOrderForm } from '../utils/orderFormHelpers'
+import { formatBrazilianPhone } from '../utils/phone'
+import { formatBrazilianCurrency, parseBrazilianCurrency } from '../utils/currency'
 import * as ordersApi from '../api/orders'
 
 type OrderWithDisplay = ReturnType<typeof getOrdersWithDisplayDates>[number]
@@ -611,7 +613,7 @@ function OrdersPage() {
     if (!current) return
 
     const quantity = editOrderForm.quantity > 0 ? editOrderForm.quantity : 1
-    const saleValue = Number(editOrderForm.saleValue) || 0
+    const saleValue = parseBrazilianCurrency(editOrderForm.saleValue) || 0
 
     const updated: OrderItem = {
       ...current,
@@ -934,7 +936,7 @@ function OrdersPage() {
                 <TextField label="Nome *" size="small" value={editOrderForm.customerFirstName} onChange={(e) => handleEditOrderFieldChange('customerFirstName', e.target.value)} fullWidth />
                 <TextField label="Sobrenome *" size="small" value={editOrderForm.customerLastName} onChange={(e) => handleEditOrderFieldChange('customerLastName', e.target.value)} fullWidth />
                 <TextField label="Email (opcional)" type="email" size="small" value={editOrderForm.customerEmail} onChange={(e) => handleEditOrderFieldChange('customerEmail', e.target.value)} fullWidth />
-                <TextField label="Contato (telefone/WhatsApp)" size="small" value={editOrderForm.customerContact} onChange={(e) => handleEditOrderFieldChange('customerContact', e.target.value)} fullWidth />
+                <TextField label="Contato (telefone/WhatsApp)" size="small" value={editOrderForm.customerContact} onChange={(e) => handleEditOrderFieldChange('customerContact', formatBrazilianPhone(e.target.value))} placeholder="(11) 99999-0000" inputProps={{ inputMode: 'numeric', maxLength: 16 }} fullWidth />
               </Box>
             </Box>
 
@@ -964,7 +966,7 @@ function OrdersPage() {
                 </FormControl>
                 <TextField label="Data de entrega *" type="date" size="small" value={editOrderForm.deliveryDate} onChange={(e) => handleEditOrderFieldChange('deliveryDate', e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
                 <TextField label="Quantidade" type="number" size="small" value={editOrderForm.quantity} onChange={(e) => handleEditOrderFieldChange('quantity', e.target.value === '' ? 0 : Number(e.target.value))} inputProps={{ min: 1 }} fullWidth />
-                <TextField label="Valor de venda (R$)" type="number" size="small" value={editOrderForm.saleValue} onChange={(e) => handleEditOrderFieldChange('saleValue', e.target.value)} fullWidth />
+                <TextField label="Valor de venda" size="small" value={editOrderForm.saleValue} onChange={(e) => handleEditOrderFieldChange('saleValue', formatBrazilianCurrency(e.target.value))} placeholder="R$ 0" inputProps={{ inputMode: 'decimal', maxLength: 18 }} fullWidth />
               </Box>
             </Box>
 

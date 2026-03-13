@@ -1,5 +1,7 @@
 import { ORDER_CATEGORIES, ORDER_STATUSES, MANUFACTURE_TYPES } from '../types/order'
 import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
+import { formatBrazilianPhone } from './phone'
+import { formatBrazilianCurrencyFromNumber } from './currency'
 
 export interface NewOrderForm {
   id: string
@@ -127,7 +129,7 @@ export function createOrderFormFromOrder(order: OrderItem): NewOrderForm {
     customerFirstName: (order.customer as { firstName?: string }).firstName ?? first,
     customerLastName: (order.customer as { lastName?: string }).lastName ?? lastName,
     customerEmail: order.customer.email ?? '',
-    customerContact: order.customer.whatsapp ?? '',
+    customerContact: formatBrazilianPhone(order.customer.whatsapp ?? ''),
     category: order.category,
     model: order.model,
     productImageUrl: order.productImageUrl ?? '',
@@ -135,7 +137,7 @@ export function createOrderFormFromOrder(order: OrderItem): NewOrderForm {
     deliveryDate: order.deliveryDate,
     status: order.status,
     quantity: order.quantity,
-    saleValue: order.saleValue ? String(order.saleValue) : '',
+    saleValue: order.saleValue ? formatBrazilianCurrencyFromNumber(order.saleValue) : '',
     notes: order.notes ?? '',
     fabric: order.specs.fabric ?? '',
     foam: order.specs.foam ?? '',

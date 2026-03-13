@@ -26,6 +26,8 @@ import {
   type NewOrderForm,
 } from '../utils/orderFormHelpers'
 import { loadSettings } from '../utils/settings'
+import { formatBrazilianPhone } from '../utils/phone'
+import { formatBrazilianCurrency, parseBrazilianCurrency } from '../utils/currency'
 import * as ordersApi from '../api/orders'
 
 const ORDER_IMAGE_FALLBACK = '/genice-brandao-atelier-logo.png'
@@ -106,7 +108,7 @@ export default function NewOrderPage() {
     }
 
     const quantity = form.quantity > 0 ? form.quantity : 1
-    const saleValue = Number(form.saleValue) || 0
+    const saleValue = parseBrazilianCurrency(form.saleValue) || 0
 
     const orderToInsert: OrderItem = {
       id: orderId,
@@ -216,8 +218,9 @@ export default function NewOrderPage() {
             label="Contato (telefone/WhatsApp) *"
             size="small"
             value={form.customerContact}
-            onChange={(e) => handleFieldChange('customerContact', e.target.value)}
+            onChange={(e) => handleFieldChange('customerContact', formatBrazilianPhone(e.target.value))}
             placeholder="Ex.: (11) 99999-0000"
+            inputProps={{ inputMode: 'numeric', maxLength: 16 }}
             fullWidth
           />
         </Box>
@@ -313,12 +316,12 @@ export default function NewOrderPage() {
             fullWidth
           />
           <TextField
-            label="Valor de venda (R$)"
-            type="number"
+            label="Valor de venda"
             size="small"
             value={form.saleValue}
-            onChange={(e) => handleFieldChange('saleValue', e.target.value)}
-            placeholder="0"
+            onChange={(e) => handleFieldChange('saleValue', formatBrazilianCurrency(e.target.value))}
+            placeholder="R$ 0"
+            inputProps={{ inputMode: 'decimal', maxLength: 18 }}
             fullWidth
           />
         </Box>

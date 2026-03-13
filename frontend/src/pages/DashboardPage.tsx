@@ -32,6 +32,7 @@ import { getOrdersWithDisplayDates } from '../data/mockOrders'
 import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
 import type { DashboardStats } from '../types/order'
 import * as ordersApi from '../api/orders'
+import { loadSettings } from '../utils/settings'
 
 const categoryIcons: Record<OrderCategory, React.ReactNode> = {
   Sofá: <WeekendIcon fontSize="small" />,
@@ -89,6 +90,7 @@ function DashboardPage() {
 
   const stats = computeStatsFromOrders(orders)
   const ordersWithDisplay = getOrdersWithDisplayDates(orders)
+  const { businessName } = loadSettings()
 
   if (loading) {
     return (
@@ -109,14 +111,21 @@ function DashboardPage() {
 
   return (
     <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
-      <Typography
-        variant="h5"
-        fontWeight={600}
-        color="text.primary"
-        sx={{ mb: { xs: 2, md: 3 }, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
-      >
-        Dashboard
-      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1, mb: { xs: 2, md: 3 } }}>
+        <Typography
+          variant="h5"
+          fontWeight={600}
+          color="text.primary"
+          sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}
+        >
+          Dashboard
+        </Typography>
+        {businessName && (
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.95rem', sm: '1.1rem' } }}>
+            {businessName}
+          </Typography>
+        )}
+      </Box>
 
       <Typography
         variant="h6"
@@ -219,7 +228,7 @@ function DashboardPage() {
           </Box>
           <Box minWidth={0}>
             <Typography variant="caption" color="text.secondary" fontWeight={600} letterSpacing={0.5} sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' } }}>
-              ENTREGUES (MÊS)
+              ENTREGUES 
             </Typography>
             <Typography variant="h4" fontWeight={700} sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }}>
               {stats.deliveredThisMonth}

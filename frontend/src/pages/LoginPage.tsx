@@ -9,6 +9,7 @@ import Alert from '@mui/material/Alert'
 import Link from '@mui/material/Link'
 import { useAuth } from '../contexts/AuthContext'
 import * as authApi from '../api/auth'
+import { formatBrazilianPhone } from '../utils/phone'
 
 type Mode = 'login' | 'register-step1' | 'register-step2'
 
@@ -217,8 +218,9 @@ export default function LoginPage() {
               label="Celular (com DDD)"
               size="small"
               value={registerPhone}
-              onChange={(e) => setRegisterPhone(e.target.value)}
+              onChange={(e) => setRegisterPhone(formatBrazilianPhone(e.target.value))}
               placeholder="(11) 99999-0000"
+              inputProps={{ inputMode: 'numeric', maxLength: 16 }}
               fullWidth
             />
             {error && <Alert severity="error">{error}</Alert>}
