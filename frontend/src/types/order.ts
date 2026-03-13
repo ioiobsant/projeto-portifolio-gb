@@ -21,7 +21,14 @@ export interface OrderCustomer {
   name: string
   whatsapp: string
   email: string
+  /** Nome (para futura lista de clientes) */
+  firstName?: string
+  /** Sobrenome (para futura lista de clientes) */
+  lastName?: string
 }
+
+export const MANUFACTURE_TYPES = ['Fabricação própria', 'Reforma'] as const
+export type ManufactureType = (typeof MANUFACTURE_TYPES)[number]
 
 export interface OrderSpecs {
   hasPainting: boolean
@@ -30,7 +37,7 @@ export interface OrderSpecs {
   fabric?: string
   foam?: string
   base?: string
-  manufactureType: 'Fabricação própria' | 'Reforma'
+  manufactureType: ManufactureType
 }
 
 export interface OrderItem {
