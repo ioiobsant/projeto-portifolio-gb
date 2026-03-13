@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import MenuIcon from '@mui/icons-material/Menu'
 import AddIcon from '@mui/icons-material/Add'
 import DashboardIcon from '@mui/icons-material/Dashboard'
@@ -51,11 +52,11 @@ function getPageTitle(pathname: string): string {
 function SidebarContent({
   onNavigate,
   onItemClick,
-  onLogout = () => {},
+  onLogout,
 }: {
   onNavigate: (path: string) => void
   onItemClick?: () => void
-  onLogout?: () => void
+  onLogout: () => void
 }) {
   const location = useLocation()
 
@@ -116,14 +117,20 @@ function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
+  const { logout } = useAuth()
 
   const handleDrawerToggle = () => setMobileOpen((v) => !v)
   const handleNav = (path: string) => navigate(path)
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   const drawer = (
     <SidebarContent
       onNavigate={handleNav}
       onItemClick={isDesktop ? undefined : handleDrawerToggle}
+      onLogout={handleLogout}
     />
   )
 

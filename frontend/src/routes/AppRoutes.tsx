@@ -1,23 +1,34 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, Outlet } from 'react-router-dom'
 import AdminLayout from '../layouts/AdminLayout.tsx'
 import DashboardPage from '../pages/DashboardPage.tsx'
 import OrdersPage from '../pages/OrdersPage.tsx'
-import CatalogModelsPage from '../pages/CatalogModelsPage.tsx'
+import NewOrderPage from '../pages/NewOrderPage.tsx'
 import ClientsPage from '../pages/ClientsPage.tsx'
 import SettingsPage from '../pages/SettingsPage.tsx'
+import LoginPage from '../pages/LoginPage.tsx'
 import NotFoundPage from '../pages/NotFoundPage.tsx'
+import { useAuth } from '../contexts/AuthContext'
+
+function ProtectedRoute() {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return <Outlet />
+}
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route element={<AdminLayout />}>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/pedidos" element={<OrdersPage />} />
-        <Route path="/catalogo" element={<CatalogModelsPage />} />
-        <Route path="/clientes" element={<ClientsPage />} />
-        <Route path="/configuracoes" element={<SettingsPage />} />
-        <Route path="/inicio" element={<Navigate to="/" replace />} />
-        <Route path="*" element={<NotFoundPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AdminLayout />}>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/pedidos" element={<OrdersPage />} />
+          <Route path="/pedidos/novo" element={<NewOrderPage />} />
+          <Route path="/clientes" element={<ClientsPage />} />
+          <Route path="/configuracoes" element={<SettingsPage />} />
+          <Route path="/inicio" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Route>
     </Routes>
   )
