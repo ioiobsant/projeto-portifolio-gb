@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
 import Collapse from '@mui/material/Collapse'
@@ -18,33 +19,41 @@ import Button from '@mui/material/Button'
 import Fab from '@mui/material/Fab'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
+import Divider from '@mui/material/Divider'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import FormControl from '@mui/material/FormControl'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import InputAdornment from '@mui/material/InputAdornment'
 import InputLabel from '@mui/material/InputLabel'
 import Select from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
+import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import SearchIcon from '@mui/icons-material/Search'
 import AddIcon from '@mui/icons-material/Add'
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
+import PersonIcon from '@mui/icons-material/Person'
+import DescriptionIcon from '@mui/icons-material/Description'
+import BuildIcon from '@mui/icons-material/Build'
 import WeekendIcon from '@mui/icons-material/Weekend'
 import BedIcon from '@mui/icons-material/Bed'
 import ChairIcon from '@mui/icons-material/Chair'
 import DinnerDiningIcon from '@mui/icons-material/DinnerDining'
 import KingBedIcon from '@mui/icons-material/KingBed'
-import { ORDER_CATEGORIES, ORDER_STATUSES } from '../types/order'
+import { ORDER_CATEGORIES, ORDER_STATUSES, MANUFACTURE_TYPES } from '../types/order'
 import type { OrderCategory, OrderItem, OrderStatus } from '../types/order'
 import { getOrdersWithDisplayDates } from '../data/mockOrders'
+import { createInitialOrderForm, createOrderFormFromOrder, type NewOrderForm } from '../utils/orderFormHelpers'
 import * as ordersApi from '../api/orders'
 
 type OrderWithDisplay = ReturnType<typeof getOrdersWithDisplayDates>[number]
@@ -76,70 +85,6 @@ type SortBy = (typeof SORT_OPTIONS)[number]['value']
 
 type FilterStatusValue = '' | OrderStatus | 'flow-asc' | 'flow-desc'
 
-interface NewOrderForm {
-  id: string
-  customerName: string
-  category: OrderCategory
-  model: string
-  productImageUrl: string
-  size: string
-  deliveryDate: string
-  status: OrderStatus
-  fabric: string
-  foam: string
-}
-
-function getTodayIsoDate(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function generateNextOrderId(orders: OrderItem[]): string {
-  const maxSuffix = orders.reduce((max, order) => {
-    const match = order.id.match(/-(\d{4})$/)
-    if (!match) {
-      return max
-    }
-    const value = Number.parseInt(match[1], 10)
-    return Number.isNaN(value) ? max : Math.max(max, value)
-  }, 0)
-
-  return `GBA-${new Date().getFullYear()}-${String(maxSuffix + 1).padStart(4, '0')}`
-}
-
-function createInitialOrderForm(orders: OrderItem[]): NewOrderForm {
-  return {
-    id: generateNextOrderId(orders),
-    customerName: '',
-    category: ORDER_CATEGORIES[0],
-    model: '',
-    productImageUrl: '',
-    size: '',
-    deliveryDate: getTodayIsoDate(),
-    status: ORDER_STATUSES[0],
-    fabric: '',
-    foam: '',
-  }
-}
-
-function createOrderFormFromOrder(order: OrderItem): NewOrderForm {
-  return {
-    id: order.id,
-    customerName: order.customer.name,
-    category: order.category,
-    model: order.model,
-    productImageUrl: order.productImageUrl ?? '',
-    size: order.size ?? '',
-    deliveryDate: order.deliveryDate,
-    status: order.status,
-    fabric: order.specs.fabric ?? '',
-    foam: order.specs.foam ?? '',
-  }
-}
-
 function compareOrders(
   a: OrderWithDisplay,
   b: OrderWithDisplay,
@@ -167,11 +112,12 @@ function compareByStatus(a: OrderWithDisplay, b: OrderWithDisplay, order: 'asc' 
 
 interface OrdersTableProps {
   rows: OrderWithDisplay[]
+  onViewDetails: (order: OrderWithDisplay) => void
   onEditOrder: (order: OrderWithDisplay) => void
   onRemoveOrder: (order: OrderWithDisplay) => void
 }
 
-function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
+function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: OrdersTableProps) {
   const theme = useTheme()
   const isCompact = useMediaQuery(theme.breakpoints.down('sm'))
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
@@ -211,7 +157,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
             md: 'minmax(240px, 300px) 1fr',
           },
           gap: { xs: 1.25, md: 1.75 },
-          bgcolor: '#fafafa',
+          bgcolor: 'action.hover',
           border: 1,
           borderColor: 'divider',
           borderRadius: 2,
@@ -227,7 +173,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
               borderRadius: 2,
               border: 1,
               borderColor: 'divider',
-              bgcolor: '#f0f0f0',
+              bgcolor: 'action.hover',
               overflow: 'hidden',
               aspectRatio: '4 / 3',
             }}
@@ -278,7 +224,23 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
           </Box>
         </Box>
       </Box>
-      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
+        <Button size="small" variant="outlined" startIcon={<VisibilityOutlinedIcon />} onClick={(e) => { e.stopPropagation(); onViewDetails(row); }}>
+          Ver mais detalhes
+        </Button>
+        <Tooltip title="Ver detalhes">
+          <IconButton
+            size="small"
+            aria-label="Ver detalhes do pedido"
+            onClick={(event) => {
+              event.stopPropagation()
+              onViewDetails(row)
+            }}
+            sx={actionButtonSx}
+          >
+            <VisibilityOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Editar pedido">
           <IconButton
             size="small"
@@ -321,7 +283,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
     >
       <Table size="medium" sx={{ minWidth: { xs: 0, md: 880 } }}>
         <TableHead>
-          <TableRow sx={{ bgcolor: '#fafafa' }}>
+          <TableRow sx={{ bgcolor: 'action.hover' }}>
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Pedido
             </TableCell>
@@ -384,7 +346,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
                             borderRadius: 1.5,
                             border: 1,
                             borderColor: 'divider',
-                            bgcolor: '#f0f0f0',
+                            bgcolor: 'action.hover',
                             flexShrink: 0,
                           }}
                         />
@@ -417,6 +379,16 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
                     </TableCell>
                     <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
                       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        <Tooltip title="Ver detalhes">
+                          <IconButton
+                            size="small"
+                            aria-label="Ver detalhes do pedido"
+                            onClick={() => onViewDetails(row)}
+                            sx={actionButtonSx}
+                          >
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Editar pedido">
                           <IconButton
                             size="small"
@@ -521,6 +493,7 @@ function OrdersTable({ rows, onEditOrder, onRemoveOrder }: OrdersTableProps) {
 const categories = ['Todos', ...ORDER_CATEGORIES] as const
 
 function OrdersPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<OrderItem[]>([])
   const [ordersLoading, setOrdersLoading] = useState<boolean>(true)
   const [ordersError, setOrdersError] = useState<string>('')
@@ -532,15 +505,13 @@ function OrdersPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatusValue>('')
   const [filterMaterial, setFilterMaterial] = useState<string>('')
   const [filterFoam, setFilterFoam] = useState<string>('')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false)
-  const [createOrderError, setCreateOrderError] = useState<string>('')
-  const [newOrderForm, setNewOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm([]))
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
   const [editOrderError, setEditOrderError] = useState<string>('')
   const [editOrderForm, setEditOrderForm] = useState<NewOrderForm>(() => createInitialOrderForm([]))
   const [editImageFileName, setEditImageFileName] = useState<string>('')
   const [orderPendingDelete, setOrderPendingDelete] = useState<OrderWithDisplay | null>(null)
+  const [orderDetailView, setOrderDetailView] = useState<OrderWithDisplay | null>(null)
 
   const fetchOrders = useCallback(async () => {
     setOrdersLoading(true)
@@ -558,6 +529,13 @@ function OrdersPage() {
   useEffect(() => {
     fetchOrders()
   }, [fetchOrders])
+
+  const orderIdFromUrl = searchParams.get('id')
+  useEffect(() => {
+    if (ordersLoading || !orderIdFromUrl || ordersWithDisplay.length === 0) return
+    const order = ordersWithDisplay.find((o) => o.id.toUpperCase() === orderIdFromUrl.toUpperCase())
+    if (order) setOrderDetailView(order)
+  }, [ordersLoading, orderIdFromUrl, ordersWithDisplay])
 
   const category = categories[tab]
 
@@ -612,70 +590,14 @@ function OrdersPage() {
     setSortBy(value)
   }
 
-  const handleOpenCreateDialog = () => {
-    setCreateOrderError('')
-    setNewOrderForm(createInitialOrderForm(orders))
-    setIsCreateDialogOpen(true)
+  const handleOpenDetailView = (order: OrderWithDisplay) => {
+    setOrderDetailView(order)
   }
 
-  const handleCloseCreateDialog = () => {
-    setIsCreateDialogOpen(false)
-  }
-
-  const handleNewOrderFieldChange = <K extends keyof NewOrderForm,>(field: K, value: NewOrderForm[K]) => {
-    setNewOrderForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleCreateOrder = async () => {
-    const generatedId = (newOrderForm.id.trim() || generateNextOrderId(orders)).toUpperCase()
-    if (!newOrderForm.customerName.trim() || !newOrderForm.model.trim() || !newOrderForm.deliveryDate) {
-      setCreateOrderError('Preencha os campos obrigatórios: cliente, modelo e data de entrega.')
-      return
-    }
-
-    if (orders.some((order) => order.id.toUpperCase() === generatedId)) {
-      setCreateOrderError('Já existe um pedido com esse ID. Informe outro identificador.')
-      return
-    }
-
-    const orderToInsert: OrderItem = {
-      id: generatedId,
-      category: newOrderForm.category,
-      model: newOrderForm.model.trim(),
-      productImageUrl: newOrderForm.productImageUrl.trim() || undefined,
-      size: newOrderForm.size.trim() || undefined,
-      customer: {
-        name: newOrderForm.customerName.trim(),
-        whatsapp: '',
-        email: '',
-      },
-      specs: {
-        hasPainting: false,
-        fabric: newOrderForm.fabric.trim() || undefined,
-        foam: newOrderForm.foam.trim() || undefined,
-        manufactureType: 'Fabricação própria',
-      },
-      quantity: 1,
-      saleValue: 0,
-      deliveryDate: newOrderForm.deliveryDate,
-      status: newOrderForm.status,
-      createdAt: getTodayIsoDate(),
-    }
-
-    setCreateOrderError('')
-    try {
-      const created = await ordersApi.createOrder(orderToInsert)
-      setOrders((prev) => [created, ...prev])
-      setTab(0)
-      setSearchId('')
-      setFilterStatus('')
-      setFilterMaterial('')
-      setFilterFoam('')
-      setSortBy('createdAt')
-      setSortOrder('desc')
-      setIsCreateDialogOpen(false)
-    } catch (e) {
-      setCreateOrderError(e instanceof Error ? e.message : 'Erro ao criar pedido.')
+  const handleCloseDetailView = () => {
+    setOrderDetailView(null)
+    if (searchParams.has('id')) {
+      setSearchParams({}, { replace: true })
     }
   }
 
@@ -726,8 +648,9 @@ function OrdersPage() {
 
     const normalizedId = editOrderForm.id.trim().toUpperCase()
 
-    if (!normalizedId || !editOrderForm.customerName.trim() || !editOrderForm.model.trim() || !editOrderForm.deliveryDate) {
-      setEditOrderError('Preencha os campos obrigatórios: ID, cliente, modelo e data de entrega.')
+    const clientName = `${(editOrderForm.customerFirstName || '').trim()} ${(editOrderForm.customerLastName || '').trim()}`.trim()
+    if (!normalizedId || !clientName || !editOrderForm.model.trim() || !editOrderForm.deliveryDate) {
+      setEditOrderError('Preencha os campos obrigatórios: ID, nome e sobrenome do cliente, modelo e data de entrega.')
       return
     }
 
@@ -743,6 +666,9 @@ function OrdersPage() {
     const current = orders.find((o) => o.id === editingOrderId)
     if (!current) return
 
+    const quantity = editOrderForm.quantity > 0 ? editOrderForm.quantity : 1
+    const saleValue = Number(editOrderForm.saleValue) || 0
+
     const updated: OrderItem = {
       ...current,
       id: normalizedId,
@@ -750,14 +676,26 @@ function OrdersPage() {
       model: editOrderForm.model.trim(),
       productImageUrl: editOrderForm.productImageUrl.trim() || undefined,
       size: editOrderForm.size.trim() || undefined,
+      quantity,
+      saleValue,
+      notes: editOrderForm.notes.trim() || undefined,
       customer: {
         ...current.customer,
-        name: editOrderForm.customerName.trim(),
+        name: clientName,
+        firstName: editOrderForm.customerFirstName.trim() || undefined,
+        lastName: editOrderForm.customerLastName.trim() || undefined,
+        email: (editOrderForm.customerEmail || '').trim() || '',
+        whatsapp: (editOrderForm.customerContact || '').trim() || current.customer.whatsapp,
       },
       specs: {
         ...current.specs,
         fabric: editOrderForm.fabric.trim() || undefined,
         foam: editOrderForm.foam.trim() || undefined,
+        base: editOrderForm.base.trim() || undefined,
+        manufactureType: editOrderForm.manufactureType,
+        hasPainting: editOrderForm.hasPainting,
+        paintColor: editOrderForm.paintColor.trim() || undefined,
+        paintFinish: editOrderForm.paintFinish.trim() || undefined,
       },
       deliveryDate: editOrderForm.deliveryDate,
       status: editOrderForm.status,
@@ -819,9 +757,10 @@ function OrdersPage() {
           Pedidos
         </Typography>
         <Button
+          component={RouterLink}
+          to="/pedidos/novo"
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={handleOpenCreateDialog}
           sx={{
             display: { xs: 'none', sm: 'inline-flex' },
             borderRadius: 2,
@@ -893,7 +832,7 @@ function OrdersPage() {
           p: 2,
           mb: 2,
           borderRadius: 3,
-          bgcolor: '#fafafa',
+          bgcolor: 'action.hover',
         }}
       >
         <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ mb: 1.5 }}>
@@ -1017,10 +956,11 @@ function OrdersPage() {
       </Paper>
 
       <Fab
+        component={RouterLink}
+        to="/pedidos/novo"
         color="primary"
         variant="extended"
         aria-label="Novo pedido"
-        onClick={handleOpenCreateDialog}
         sx={{
           display: { xs: 'flex', sm: 'none' },
           position: 'fixed',
@@ -1036,264 +976,106 @@ function OrdersPage() {
         Novo pedido
       </Fab>
 
-      <Dialog open={isCreateDialogOpen} onClose={handleCloseCreateDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Novo pedido</DialogTitle>
-        <DialogContent dividers>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-              gap: 2,
-              mt: 0.5,
-            }}
-          >
-            <TextField
-              label="ID do pedido"
-              size="small"
-              value={newOrderForm.id}
-              onChange={(e) => handleNewOrderFieldChange('id', e.target.value)}
-              helperText="Se vazio, um ID automático será gerado."
-              fullWidth
-            />
-            <TextField
-              label="Cliente *"
-              size="small"
-              value={newOrderForm.customerName}
-              onChange={(e) => handleNewOrderFieldChange('customerName', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Modelo *"
-              size="small"
-              value={newOrderForm.model}
-              onChange={(e) => handleNewOrderFieldChange('model', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Tamanho"
-              size="small"
-              value={newOrderForm.size}
-              onChange={(e) => handleNewOrderFieldChange('size', e.target.value)}
-              fullWidth
-            />
-            <FormControl size="small" fullWidth>
-              <InputLabel id="new-order-category-label">Categoria</InputLabel>
-              <Select
-                labelId="new-order-category-label"
-                label="Categoria"
-                value={newOrderForm.category}
-                onChange={(e) => handleNewOrderFieldChange('category', e.target.value as OrderCategory)}
-              >
-                {ORDER_CATEGORIES.map((categoryOption) => (
-                  <MenuItem key={categoryOption} value={categoryOption}>
-                    {categoryOption}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel id="new-order-status-label">Status</InputLabel>
-              <Select
-                labelId="new-order-status-label"
-                label="Status"
-                value={newOrderForm.status}
-                onChange={(e) => handleNewOrderFieldChange('status', e.target.value as OrderStatus)}
-              >
-                {ORDER_STATUSES.map((statusOption) => (
-                  <MenuItem key={statusOption} value={statusOption}>
-                    {statusOption}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="Data de entrega *"
-              type="date"
-              size="small"
-              value={newOrderForm.deliveryDate}
-              onChange={(e) => handleNewOrderFieldChange('deliveryDate', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-            <TextField
-              label="Material"
-              size="small"
-              value={newOrderForm.fabric}
-              onChange={(e) => handleNewOrderFieldChange('fabric', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Tipo de esponja"
-              size="small"
-              value={newOrderForm.foam}
-              onChange={(e) => handleNewOrderFieldChange('foam', e.target.value)}
-              fullWidth
-              sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }}
-            />
-          </Box>
-          {createOrderError ? (
-            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
-              {createOrderError}
-            </Typography>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseCreateDialog}>Cancelar</Button>
-          <Button variant="contained" onClick={handleCreateOrder}>
-            Salvar pedido
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={isEditDialogOpen} onClose={handleCloseEditDialog} fullWidth maxWidth="sm">
+      <Dialog open={isEditDialogOpen} onClose={handleCloseEditDialog} fullWidth maxWidth="md">
         <DialogTitle>Editar pedido</DialogTitle>
         <DialogContent dividers>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-              gap: 2,
-              mt: 0.5,
-            }}
-          >
-            <TextField
-              label="ID do pedido *"
-              size="small"
-              value={editOrderForm.id}
-              onChange={(e) => handleEditOrderFieldChange('id', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Cliente *"
-              size="small"
-              value={editOrderForm.customerName}
-              onChange={(e) => handleEditOrderFieldChange('customerName', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Modelo *"
-              size="small"
-              value={editOrderForm.model}
-              onChange={(e) => handleEditOrderFieldChange('model', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Tamanho"
-              size="small"
-              value={editOrderForm.size}
-              onChange={(e) => handleEditOrderFieldChange('size', e.target.value)}
-              fullWidth
-            />
-            <FormControl size="small" fullWidth>
-              <InputLabel id="edit-order-category-label">Categoria</InputLabel>
-              <Select
-                labelId="edit-order-category-label"
-                label="Categoria"
-                value={editOrderForm.category}
-                onChange={(e) => handleEditOrderFieldChange('category', e.target.value as OrderCategory)}
-              >
-                {ORDER_CATEGORIES.map((categoryOption) => (
-                  <MenuItem key={categoryOption} value={categoryOption}>
-                    {categoryOption}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel id="edit-order-status-label">Status</InputLabel>
-              <Select
-                labelId="edit-order-status-label"
-                label="Status"
-                value={editOrderForm.status}
-                onChange={(e) => handleEditOrderFieldChange('status', e.target.value as OrderStatus)}
-              >
-                {ORDER_STATUSES.map((statusOption) => (
-                  <MenuItem key={statusOption} value={statusOption}>
-                    {statusOption}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="Data de entrega *"
-              type="date"
-              size="small"
-              value={editOrderForm.deliveryDate}
-              onChange={(e) => handleEditOrderFieldChange('deliveryDate', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-            <TextField
-              label="Material"
-              size="small"
-              value={editOrderForm.fabric}
-              onChange={(e) => handleEditOrderFieldChange('fabric', e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Tipo de esponja"
-              size="small"
-              value={editOrderForm.foam}
-              onChange={(e) => handleEditOrderFieldChange('foam', e.target.value)}
-              fullWidth
-              sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }}
-            />
-            <Box
-              sx={{
-                gridColumn: { xs: 'auto', sm: 'span 2' },
-                display: 'grid',
-                gap: 1,
-                p: 1.25,
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 2,
-                bgcolor: '#fafafa',
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={600}>
-                Imagem do produto
-              </Typography>
-              <Box
-                sx={{
-                  width: '100%',
-                  maxWidth: { xs: '100%', sm: 280 },
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  bgcolor: '#f0f0f0',
-                  aspectRatio: '4 / 3',
-                }}
-              >
-                <Box
-                  component="img"
-                  src={editOrderForm.productImageUrl || ORDER_IMAGE_FALLBACK}
-                  alt={`Pré-visualização do produto ${editOrderForm.model || ''}`}
-                  sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Dados do cliente */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <PersonIcon color="action" fontSize="small" />
+                <Typography variant="subtitle1" fontWeight={600}>Dados do cliente</Typography>
               </Box>
-              <Button component="label" variant="outlined" startIcon={<UploadFileIcon />} sx={{ width: 'fit-content' }}>
-                Fazer upload da imagem
-                <input hidden type="file" accept="image/*" onChange={handleEditImageUpload} />
-              </Button>
-              <Typography variant="caption" color="text.secondary">
-                {editImageFileName
-                  ? `Arquivo selecionado: ${editImageFileName}`
-                  : 'Campo visual de upload disponível para mostrar que a troca de imagem é possível no front-end.'}
-              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <TextField label="Nome *" size="small" value={editOrderForm.customerFirstName} onChange={(e) => handleEditOrderFieldChange('customerFirstName', e.target.value)} fullWidth />
+                <TextField label="Sobrenome *" size="small" value={editOrderForm.customerLastName} onChange={(e) => handleEditOrderFieldChange('customerLastName', e.target.value)} fullWidth />
+                <TextField label="Email (opcional)" type="email" size="small" value={editOrderForm.customerEmail} onChange={(e) => handleEditOrderFieldChange('customerEmail', e.target.value)} fullWidth />
+                <TextField label="Contato (telefone/WhatsApp)" size="small" value={editOrderForm.customerContact} onChange={(e) => handleEditOrderFieldChange('customerContact', e.target.value)} fullWidth />
+              </Box>
+            </Box>
+
+            <Divider />
+
+            {/* Dados do pedido */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <DescriptionIcon color="action" fontSize="small" />
+                <Typography variant="subtitle1" fontWeight={600}>Dados do pedido</Typography>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <TextField label="ID do pedido *" size="small" value={editOrderForm.id} onChange={(e) => handleEditOrderFieldChange('id', e.target.value)} fullWidth />
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="edit-order-category-label">Categoria</InputLabel>
+                  <Select labelId="edit-order-category-label" label="Categoria" value={editOrderForm.category} onChange={(e) => handleEditOrderFieldChange('category', e.target.value as OrderCategory)}>
+                    {ORDER_CATEGORIES.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <TextField label="Modelo *" size="small" value={editOrderForm.model} onChange={(e) => handleEditOrderFieldChange('model', e.target.value)} fullWidth />
+                <TextField label="Medidas" size="small" value={editOrderForm.size} onChange={(e) => handleEditOrderFieldChange('size', e.target.value)} placeholder="Ex.: 138 x 188 cm ou L 138 x A 188 x P 90 cm" fullWidth />
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="edit-order-status-label">Status</InputLabel>
+                  <Select labelId="edit-order-status-label" label="Status" value={editOrderForm.status} onChange={(e) => handleEditOrderFieldChange('status', e.target.value as OrderStatus)}>
+                    {ORDER_STATUSES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <TextField label="Data de entrega *" type="date" size="small" value={editOrderForm.deliveryDate} onChange={(e) => handleEditOrderFieldChange('deliveryDate', e.target.value)} InputLabelProps={{ shrink: true }} fullWidth />
+                <TextField label="Quantidade" type="number" size="small" value={editOrderForm.quantity} onChange={(e) => handleEditOrderFieldChange('quantity', e.target.value === '' ? 0 : Number(e.target.value))} inputProps={{ min: 1 }} fullWidth />
+                <TextField label="Valor de venda (R$)" type="number" size="small" value={editOrderForm.saleValue} onChange={(e) => handleEditOrderFieldChange('saleValue', e.target.value)} fullWidth />
+              </Box>
+            </Box>
+
+            <Divider />
+
+            {/* Imagem do produto */}
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>Imagem do produto</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 2 }}>
+                <Box sx={{ width: 120, height: 120, borderRadius: 2, border: 1, borderColor: 'divider', overflow: 'hidden', bgcolor: 'action.hover', flexShrink: 0 }}>
+                  <Box component="img" src={editOrderForm.productImageUrl || ORDER_IMAGE_FALLBACK} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Button component="label" variant="outlined" size="small" startIcon={<UploadFileIcon />}>
+                    Enviar outra imagem
+                    <input hidden type="file" accept="image/*" onChange={handleEditImageUpload} />
+                  </Button>
+                  {editImageFileName && <Typography variant="caption" color="text.secondary">{editImageFileName}</Typography>}
+                </Box>
+              </Box>
+            </Box>
+
+            <Divider />
+
+            {/* Especificações */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <BuildIcon color="action" fontSize="small" />
+                <Typography variant="subtitle1" fontWeight={600}>Especificações</Typography>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                <TextField label="Material" size="small" value={editOrderForm.fabric} onChange={(e) => handleEditOrderFieldChange('fabric', e.target.value)} fullWidth />
+                <TextField label="Tipo de esponja" size="small" value={editOrderForm.foam} onChange={(e) => handleEditOrderFieldChange('foam', e.target.value)} fullWidth />
+                <TextField label="Base" size="small" value={editOrderForm.base} onChange={(e) => handleEditOrderFieldChange('base', e.target.value)} fullWidth />
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="edit-manufacture-label">Tipo de fabricação</InputLabel>
+                  <Select labelId="edit-manufacture-label" label="Tipo de fabricação" value={editOrderForm.manufactureType} onChange={(e) => handleEditOrderFieldChange('manufactureType', e.target.value as NewOrderForm['manufactureType'])}>
+                    {MANUFACTURE_TYPES.map((opt) => <MenuItem key={opt} value={opt}>{opt}</MenuItem>)}
+                  </Select>
+                </FormControl>
+                <FormControlLabel control={<Switch checked={editOrderForm.hasPainting} onChange={(e) => handleEditOrderFieldChange('hasPainting', e.target.checked)} />} label="Possui pintura" sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }} />
+                {editOrderForm.hasPainting && (
+                  <>
+                    <TextField label="Cor da pintura" size="small" value={editOrderForm.paintColor} onChange={(e) => handleEditOrderFieldChange('paintColor', e.target.value)} fullWidth />
+                    <TextField label="Acabamento da pintura" size="small" value={editOrderForm.paintFinish} onChange={(e) => handleEditOrderFieldChange('paintFinish', e.target.value)} fullWidth />
+                  </>
+                )}
+              </Box>
             </Box>
           </Box>
-          {editOrderError ? (
-            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
-              {editOrderError}
-            </Typography>
-          ) : null}
+          {editOrderError && <Typography variant="body2" color="error" sx={{ mt: 2 }}>{editOrderError}</Typography>}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseEditDialog}>Cancelar</Button>
-          <Button variant="contained" onClick={handleEditOrder}>
-            Salvar alterações
-          </Button>
+          <Button variant="contained" onClick={handleEditOrder}>Salvar alterações</Button>
         </DialogActions>
       </Dialog>
 
@@ -1314,7 +1096,75 @@ function OrdersPage() {
         </DialogActions>
       </Dialog>
 
-      <OrdersTable rows={filteredList} onEditOrder={handleOpenEditDialog} onRemoveOrder={handleOpenRemoveDialog} />
+      <Dialog open={Boolean(orderDetailView)} onClose={handleCloseDetailView} fullWidth maxWidth="sm">
+        <DialogTitle>Detalhes do pedido {orderDetailView?.id}</DialogTitle>
+        <DialogContent dividers>
+          {orderDetailView && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Cliente
+                </Typography>
+                <Typography variant="body2"><strong>Nome:</strong> {orderDetailView.customer.name}</Typography>
+                {(orderDetailView.customer as { email?: string }).email && (
+                  <Typography variant="body2"><strong>Email:</strong> {(orderDetailView.customer as { email?: string }).email}</Typography>
+                )}
+                {orderDetailView.customer.whatsapp && (
+                  <Typography variant="body2"><strong>Contato:</strong> {orderDetailView.customer.whatsapp}</Typography>
+                )}
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Pedido
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <Box sx={{ width: 100, height: 100, borderRadius: 1.5, overflow: 'hidden', border: 1, borderColor: 'divider', flexShrink: 0 }}>
+                    <Box component="img" src={orderDetailView.productImageUrl ?? ORDER_IMAGE_FALLBACK} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </Box>
+                  <Box sx={{ display: 'grid', gap: 0.5 }}>
+                    <Typography variant="body2"><strong>ID:</strong> {orderDetailView.id}</Typography>
+                    <Typography variant="body2"><strong>Categoria:</strong> {orderDetailView.category}</Typography>
+                    <Typography variant="body2"><strong>Modelo:</strong> {orderDetailView.model}</Typography>
+                    {orderDetailView.size && <Typography variant="body2"><strong>Medidas:</strong> {orderDetailView.size}</Typography>}
+                    <Typography variant="body2"><strong>Data de entrega:</strong> {orderDetailView.deliveryDateDisplay}</Typography>
+                    <Typography variant="body2"><strong>Status:</strong> <Chip label={orderDetailView.status} color={statusColors[orderDetailView.status]} size="small" sx={{ height: 20, fontSize: '0.75rem' }} /></Typography>
+                    <Typography variant="body2"><strong>Quantidade:</strong> {orderDetailView.quantity}</Typography>
+                    <Typography variant="body2"><strong>Valor de venda:</strong> R$ {orderDetailView.saleValue.toLocaleString('pt-BR')}</Typography>
+                    <Typography variant="body2"><strong>Data do pedido:</strong> {orderDetailView.createdAt}</Typography>
+                    {orderDetailView.notes && <Typography variant="body2"><strong>Observações:</strong> {orderDetailView.notes}</Typography>}
+                  </Box>
+                </Box>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                  Especificações
+                </Typography>
+                <Typography variant="body2"><strong>Material:</strong> {orderDetailView.specs.fabric ?? 'Não informado'}</Typography>
+                <Typography variant="body2"><strong>Tipo de esponja:</strong> {orderDetailView.specs.foam ?? 'Não informado'}</Typography>
+                <Typography variant="body2"><strong>Base:</strong> {orderDetailView.specs.base ?? 'Não informado'}</Typography>
+                <Typography variant="body2"><strong>Tipo de fabricação:</strong> {orderDetailView.specs.manufactureType}</Typography>
+                <Typography variant="body2"><strong>Possui pintura:</strong> {orderDetailView.specs.hasPainting ? 'Sim' : 'Não'}</Typography>
+                {orderDetailView.specs.hasPainting && (
+                  <>
+                    <Typography variant="body2"><strong>Cor da pintura:</strong> {orderDetailView.specs.paintColor ?? '—'}</Typography>
+                    <Typography variant="body2"><strong>Acabamento:</strong> {orderDetailView.specs.paintFinish ?? '—'}</Typography>
+                  </>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDetailView}>Fechar</Button>
+          {orderDetailView && (
+            <Button variant="contained" startIcon={<EditOutlinedIcon />} onClick={() => { handleCloseDetailView(); handleOpenEditDialog(orderDetailView); }}>
+              Editar pedido
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <OrdersTable rows={filteredList} onViewDetails={handleOpenDetailView} onEditOrder={handleOpenEditDialog} onRemoveOrder={handleOpenRemoveDialog} />
         </>
       )}
     </Box>

@@ -130,7 +130,7 @@ function DashboardPage() {
           sx={{
             p: { xs: 1.5, sm: 2 },
             borderRadius: 3,
-            bgcolor: '#fafafa',
+            bgcolor: 'background.paper',
             display: 'flex',
             alignItems: 'center',
             gap: { xs: 1.5, sm: 2 },
@@ -153,7 +153,7 @@ function DashboardPage() {
           sx={{
             p: { xs: 1.5, sm: 2 },
             borderRadius: 3,
-            bgcolor: '#fafafa',
+            bgcolor: 'background.paper',
             display: 'flex',
             alignItems: 'center',
             gap: { xs: 1.5, sm: 2 },
@@ -176,7 +176,7 @@ function DashboardPage() {
           sx={{
             p: { xs: 1.5, sm: 2 },
             borderRadius: 3,
-            bgcolor: '#fafafa',
+            bgcolor: 'background.paper',
             display: 'flex',
             alignItems: 'center',
             gap: { xs: 1.5, sm: 2 },
@@ -199,7 +199,7 @@ function DashboardPage() {
           sx={{
             p: { xs: 1.5, sm: 2 },
             borderRadius: 3,
-            bgcolor: '#fafafa',
+            bgcolor: 'background.paper',
             display: 'flex',
             alignItems: 'center',
             gap: { xs: 1.5, sm: 2 },
@@ -247,7 +247,7 @@ function DashboardPage() {
       >
         <Table size="medium" sx={{ minWidth: 640 }}>
           <TableHead>
-            <TableRow sx={{ bgcolor: '#fafafa' }}>
+            <TableRow sx={{ bgcolor: 'action.hover' }}>
               <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>ID</TableCell>
               <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Cliente</TableCell>
               <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Categoria</TableCell>

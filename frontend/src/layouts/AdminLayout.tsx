@@ -14,9 +14,9 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import MenuIcon from '@mui/icons-material/Menu'
+import AddIcon from '@mui/icons-material/Add'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import DescriptionIcon from '@mui/icons-material/Description'
-import WeekendIcon from '@mui/icons-material/Weekend'
 import PeopleIcon from '@mui/icons-material/People'
 import SettingsIcon from '@mui/icons-material/Settings'
 import LogoutIcon from '@mui/icons-material/Logout'
@@ -26,7 +26,7 @@ const DRAWER_WIDTH = 260
 const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { path: '/pedidos', label: 'Pedidos', icon: <DescriptionIcon /> },
-  { path: '/catalogo', label: 'Catálogo de Modelos', icon: <WeekendIcon /> },
+  { path: '/pedidos/novo', label: 'Novo pedido', icon: <AddIcon /> },
   { path: '/clientes', label: 'Clientes', icon: <PeopleIcon /> },
   { path: '/configuracoes', label: 'Configurações', icon: <SettingsIcon /> },
 ]
@@ -34,13 +34,14 @@ const navItems = [
 const navLabels: Record<string, string> = {
   '/': 'Dashboard',
   '/pedidos': 'Pedidos',
-  '/catalogo': 'Catálogo de Modelos',
+  '/pedidos/novo': 'Novo pedido',
   '/clientes': 'Clientes',
   '/configuracoes': 'Configurações',
 }
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/') return navLabels['/']
+  if (pathname.startsWith('/pedidos/novo')) return 'Novo pedido'
   for (const path of Object.keys(navLabels)) {
     if (path !== '/' && pathname.startsWith(path)) return navLabels[path]
   }
@@ -50,9 +51,11 @@ function getPageTitle(pathname: string): string {
 function SidebarContent({
   onNavigate,
   onItemClick,
+  onLogout = () => {},
 }: {
   onNavigate: (path: string) => void
   onItemClick?: () => void
+  onLogout?: () => void
 }) {
   const location = useLocation()
 
@@ -95,7 +98,7 @@ function SidebarContent({
       <Box sx={{ flex: 1 }} />
       <List sx={{ px: 1, pb: 2 }}>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => {}} sx={{ borderRadius: 2 }}>
+          <ListItemButton onClick={onLogout} sx={{ borderRadius: 2 }}>
             <ListItemIcon sx={{ minWidth: 40 }}>
               <LogoutIcon />
             </ListItemIcon>
@@ -125,16 +128,16 @@ function AdminLayout() {
   )
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* Mobile: AppBar + temporary drawer */}
       {!isDesktop && (
         <AppBar
           position="fixed"
           sx={{
             width: '100%',
-            bgcolor: '#fff',
+            bgcolor: 'background.paper',
             color: 'text.primary',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            boxShadow: 1,
           }}
         >
           <Toolbar sx={{ minHeight: { xs: 56 } }}>
@@ -167,7 +170,7 @@ function AdminLayout() {
             boxSizing: 'border-box',
             borderRight: '1px solid',
             borderColor: 'divider',
-            bgcolor: '#fafafa',
+            bgcolor: 'background.paper',
             mt: isDesktop ? 0 : 0,
             pt: isDesktop ? 0 : 2,
           },
@@ -183,11 +186,11 @@ function AdminLayout() {
           width: isDesktop ? undefined : '100%',
           p: { xs: 2, sm: 2.5, md: 3 },
           pt: { xs: 8, sm: 9, md: 3 },
-          bgcolor: '#fff',
+          bgcolor: 'background.paper',
           minHeight: '100vh',
           borderTopLeftRadius: { xs: 0, md: 16 },
           borderBottomLeftRadius: { xs: 0, md: 16 },
-          boxShadow: { xs: 'none', md: '-4px 0 24px rgba(0,0,0,0.04)' },
+          boxShadow: { xs: 'none', md: 1 },
         }}
       >
         <Outlet />
