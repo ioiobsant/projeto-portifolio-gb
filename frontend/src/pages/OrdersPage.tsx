@@ -138,65 +138,55 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
     },
   }
 
+  /** Card expansível no estilo referência: "Imagem do produto" + atributos em lista vertical, sem cortar bordas */
   const renderExpandedDetails = (row: OrderWithDisplay) => (
     <Box
       sx={{
-        px: { xs: 1, sm: 1.5 },
+        px: 1.5,
         pb: 1.5,
         pt: 0.5,
-        display: 'grid',
+        display: 'flex',
+        flexDirection: 'column',
         gap: 1.25,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       }}
     >
-      <Box
+      <Paper
+        variant="outlined"
         sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'minmax(200px, 240px) 1fr',
-            md: 'minmax(240px, 300px) 1fr',
-          },
-          gap: { xs: 1.25, md: 1.75 },
-          bgcolor: 'action.hover',
-          border: 1,
-          borderColor: 'divider',
+          bgcolor: 'grey.50',
           borderRadius: 2,
-          p: 1.25,
+          p: 1.5,
+          border: '1px solid',
+          borderColor: 'divider',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'grid', gap: 0.75 }}>
-          <Typography variant="caption" color="text.secondary">
-            Imagem do produto
-          </Typography>
-          <Box
-            sx={{
-              borderRadius: 2,
-              border: 1,
-              borderColor: 'divider',
-              bgcolor: 'action.hover',
-              overflow: 'hidden',
-              aspectRatio: '4 / 3',
-            }}
-          >
-            <Box
-              component="img"
-              src={row.productImageUrl ?? ORDER_IMAGE_FALLBACK}
-              alt={`Produto ${row.model}`}
-              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </Box>
-        </Box>
+        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+          Imagem do produto
+        </Typography>
         <Box
           sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(180px, 260px))' },
-            rowGap: 1,
-            columnGap: { xs: 1, md: 1.5 },
-            justifyContent: 'start',
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: 1,
+            borderColor: 'divider',
+            bgcolor: 'action.hover',
+            aspectRatio: '4 / 3',
+            maxWidth: '100%',
           }}
         >
+          <Box
+            component="img"
+            src={row.productImageUrl ?? ORDER_IMAGE_FALLBACK}
+            alt={`Produto ${row.model}`}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1.25 }}>
           <Box>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               Categoria
             </Typography>
             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -205,52 +195,36 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
             </Typography>
           </Box>
           <Box>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               Modelo
             </Typography>
             <Typography variant="body2">{row.size ? `${row.model} (${row.size})` : row.model}</Typography>
           </Box>
           <Box>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               Material
             </Typography>
             <Typography variant="body2">{row.specs.fabric ?? 'Não informado'}</Typography>
           </Box>
           <Box>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               Tipo de esponja
             </Typography>
             <Typography variant="body2">{row.specs.foam ?? 'Não informado'}</Typography>
           </Box>
         </Box>
-      </Box>
-      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
-        <Button size="small" variant="outlined" startIcon={<VisibilityOutlinedIcon />} onClick={(e) => { e.stopPropagation(); onViewDetails(row); }}>
+      </Paper>
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<VisibilityOutlinedIcon />}
+          onClick={(e) => { e.stopPropagation(); onViewDetails(row); }}
+        >
           Ver mais detalhes
         </Button>
-        <Tooltip title="Ver detalhes">
-          <IconButton
-            size="small"
-            aria-label="Ver detalhes do pedido"
-            onClick={(event) => {
-              event.stopPropagation()
-              onViewDetails(row)
-            }}
-            sx={actionButtonSx}
-          >
-            <VisibilityOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
         <Tooltip title="Editar pedido">
-          <IconButton
-            size="small"
-            aria-label="Editar pedido"
-            onClick={(event) => {
-              event.stopPropagation()
-              onEditOrder(row)
-            }}
-            sx={actionButtonSx}
-          >
+          <IconButton size="small" aria-label="Editar pedido" onClick={(e) => { e.stopPropagation(); onEditOrder(row); }} sx={actionButtonSx}>
             <EditOutlinedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -258,10 +232,7 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
           <IconButton
             size="small"
             aria-label="Remover pedido"
-            onClick={(event) => {
-              event.stopPropagation()
-              onRemoveOrder(row)
-            }}
+            onClick={(e) => { e.stopPropagation(); onRemoveOrder(row); }}
             sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}
           >
             <DeleteOutlineIcon fontSize="small" />
@@ -270,6 +241,90 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
       </Box>
     </Box>
   )
+
+  /** Vista mobile: lista de cards com âncora (chevron) para expandir, sem tabela e sem cortar layout */
+  if (isCompact) {
+    return (
+      <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <Box sx={{ bgcolor: 'action.hover', px: 1.5, py: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: '0 0 72px', maxWidth: '100%' }}>Pedido</Typography>
+          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: '1 1 60px', minWidth: 0 }}>Cliente</Typography>
+          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: '0 0 88px', maxWidth: '100%' }}>Status</Typography>
+          <Box sx={{ flex: '0 0 40px', maxWidth: '100%' }} aria-hidden />
+        </Box>
+        {rows.length === 0 ? (
+          <Box sx={{ py: 4, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Nenhum pedido encontrado com os filtros selecionados.
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            {rows.map((row) => {
+              const isExpanded = expandedRowId === row.id
+              return (
+                <Fragment key={row.id}>
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => toggleRow(row.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRow(row.id); } }}
+                    aria-expanded={isExpanded}
+                    sx={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      flexWrap: 'wrap',
+                      px: 1.5,
+                      py: 1.25,
+                      border: 0,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'transparent',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      font: 'inherit',
+                      color: 'inherit',
+                      boxSizing: 'border-box',
+                      '&:last-of-type': { borderBottom: 0 },
+                      '&:hover': { bgcolor: 'action.hover' },
+                    }}
+                  >
+                    <Box sx={{ minWidth: 72, flexShrink: 0 }}>
+                      <Typography variant="caption" sx={{ display: 'block', fontFamily: 'monospace', color: 'text.secondary', fontSize: '0.75rem' }}>
+                        {row.id}
+                      </Typography>
+                      <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontSize: '0.75rem' }}>
+                        Entrega: {row.deliveryDateDisplay}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', fontSize: '0.875rem' }}>
+                      {row.customer.name}
+                    </Typography>
+                    <Chip
+                      label={row.status}
+                      color={statusColors[row.status]}
+                      size="small"
+                      sx={{ fontWeight: 600, borderRadius: 2, fontSize: '0.75rem', flexShrink: 0 }}
+                    />
+                    <Box sx={{ width: 40, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }} aria-label={isExpanded ? 'Recolher' : 'Expandir'}>
+                      {isExpanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                    </Box>
+                  </Box>
+                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                    <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+                      {renderExpandedDetails(row)}
+                    </Box>
+                  </Collapse>
+                </Fragment>
+              )
+            })}
+          </Box>
+        )}
+      </Paper>
+    )
+  }
 
   return (
     <TableContainer
@@ -281,7 +336,7 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
         WebkitOverflowScrolling: 'touch',
       }}
     >
-      <Table size="medium" sx={{ minWidth: { xs: 0, md: 880 } }}>
+      <Table size="medium" sx={{ minWidth: 880 }}>
         <TableHead>
           <TableRow sx={{ bgcolor: 'action.hover' }}>
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
@@ -290,199 +345,88 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Cliente
             </TableCell>
-            {!isCompact ? (
-              <>
-                <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  Produto
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                  Data de Entrega
-                </TableCell>
-              </>
-            ) : null}
+            <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+              Produto
+            </TableCell>
+            <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+              Data de Entrega
+            </TableCell>
             <TableCell sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
               Status
             </TableCell>
-            <TableCell
-              align="right"
-              sx={{
-                fontWeight: 600,
-                py: { xs: 1, sm: 1.5 },
-                fontSize: { xs: '0.8rem', sm: '0.875rem' },
-                width: { xs: 72, sm: 'auto' },
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {isCompact ? 'Abrir' : 'Ações'}
+            <TableCell align="right" sx={{ fontWeight: 600, py: { xs: 1, sm: 1.5 }, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+              Ações
             </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={isCompact ? 4 : 6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+              <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                 Nenhum pedido encontrado com os filtros selecionados.
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row) => {
-              const isExpanded = expandedRowId === row.id
-
-              if (!isCompact) {
-                return (
-                  <TableRow key={row.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                    <TableCell sx={{ fontFamily: 'monospace', py: 1.25, fontSize: '0.8rem' }}>{row.id}</TableCell>
-                    <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.customer.name}</TableCell>
-                    <TableCell sx={{ py: 1.25 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
-                        <Box
-                          component="img"
-                          src={row.productImageUrl ?? ORDER_IMAGE_FALLBACK}
-                          alt={`Produto ${row.model}`}
-                          sx={{
-                            width: { md: 88, lg: 96 },
-                            height: { md: 66, lg: 72 },
-                            objectFit: 'cover',
-                            borderRadius: 1.5,
-                            border: 1,
-                            borderColor: 'divider',
-                            bgcolor: 'action.hover',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Box sx={{ display: 'grid', gap: 0.25, minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {row.size ? `${row.model} (${row.size})` : row.model}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-                          >
-                            {categoryIcons[row.category]}
-                            {row.category}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Material: {row.specs.fabric ?? 'Não informado'}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.deliveryDateDisplay}</TableCell>
-                    <TableCell sx={{ py: 1.25 }}>
-                      <Chip
-                        label={row.status}
-                        color={statusColors[row.status]}
-                        size="small"
-                        sx={{ fontWeight: 500, borderRadius: 2, fontSize: '0.8125rem' }}
-                      />
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                        <Tooltip title="Ver detalhes">
-                          <IconButton
-                            size="small"
-                            aria-label="Ver detalhes do pedido"
-                            onClick={() => onViewDetails(row)}
-                            sx={actionButtonSx}
-                          >
-                            <VisibilityOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Editar pedido">
-                          <IconButton
-                            size="small"
-                            aria-label="Editar pedido"
-                            onClick={() => onEditOrder(row)}
-                            sx={actionButtonSx}
-                          >
-                            <EditOutlinedIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Remover pedido">
-                          <IconButton
-                            size="small"
-                            aria-label="Remover pedido"
-                            onClick={() => onRemoveOrder(row)}
-                            sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                )
-              }
-
-              return (
-                <Fragment key={row.id}>
-                  <TableRow
-                    hover
-                    onClick={() => toggleRow(row.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        toggleRow(row.id)
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    sx={{
-                      cursor: 'pointer',
-                      '& > *': { borderBottom: isExpanded ? 0 : undefined },
-                      '&:last-child td, &:last-child th': { border: 0 },
-                    }}
-                  >
-                    <TableCell sx={{ py: 1.25 }}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          display: 'block',
-                          color: 'text.secondary',
-                          fontFamily: 'monospace',
-                          fontSize: '0.72rem',
-                        }}
-                      >
-                        {row.id}
+            rows.map((row) => (
+              <TableRow key={row.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                <TableCell sx={{ fontFamily: 'monospace', py: 1.25, fontSize: '0.8rem' }}>{row.id}</TableCell>
+                <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.customer.name}</TableCell>
+                <TableCell sx={{ py: 1.25 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                    <Box
+                      component="img"
+                      src={row.productImageUrl ?? ORDER_IMAGE_FALLBACK}
+                      alt={`Produto ${row.model}`}
+                      sx={{
+                        width: 88,
+                        height: 66,
+                        objectFit: 'cover',
+                        borderRadius: 1.5,
+                        border: 1,
+                        borderColor: 'divider',
+                        bgcolor: 'action.hover',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Box sx={{ display: 'grid', gap: 0.25, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {row.size ? `${row.model} (${row.size})` : row.model}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.72rem' }}>
-                        Entrega: {row.deliveryDateDisplay}
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {categoryIcons[row.category]}
+                        {row.category}
                       </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 1.25, fontSize: '0.8rem' }}>{row.customer.name}</TableCell>
-                    <TableCell sx={{ py: 1.25 }}>
-                      <Chip
-                        label={row.status}
-                        color={statusColors[row.status]}
-                        size="small"
-                        sx={{ fontWeight: 500, borderRadius: 2, fontSize: '0.7rem' }}
-                      />
-                    </TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{ py: 0.75, pr: 1, width: 72, whiteSpace: 'nowrap', verticalAlign: 'middle' }}
-                    >
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
-                        {isExpanded ? (
-                          <KeyboardArrowUpIcon sx={{ fontSize: '1rem', color: 'text.disabled' }} />
-                        ) : (
-                          <KeyboardArrowDownIcon sx={{ fontSize: '1rem', color: 'text.disabled' }} />
-                        )}
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={4} sx={{ py: 0 }}>
-                      <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                        {renderExpandedDetails(row)}
-                      </Collapse>
-                    </TableCell>
-                  </TableRow>
-                </Fragment>
-              )
-            })
+                      <Typography variant="caption" color="text.secondary">
+                        Material: {row.specs.fabric ?? 'Não informado'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.deliveryDateDisplay}</TableCell>
+                <TableCell sx={{ py: 1.25 }}>
+                  <Chip label={row.status} color={statusColors[row.status]} size="small" sx={{ fontWeight: 500, borderRadius: 2, fontSize: '0.8125rem' }} />
+                </TableCell>
+                <TableCell align="right" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                    <Tooltip title="Ver detalhes">
+                      <IconButton size="small" aria-label="Ver detalhes do pedido" onClick={() => onViewDetails(row)} sx={actionButtonSx}>
+                        <VisibilityOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Editar pedido">
+                      <IconButton size="small" aria-label="Editar pedido" onClick={() => onEditOrder(row)} sx={actionButtonSx}>
+                        <EditOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Remover pedido">
+                      <IconButton size="small" aria-label="Remover pedido" onClick={() => onRemoveOrder(row)} sx={{ ...actionButtonSx, borderColor: 'error.light', color: 'error.main' }}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))
           )}
         </TableBody>
       </Table>

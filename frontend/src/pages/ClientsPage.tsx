@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -14,6 +14,10 @@ import Button from '@mui/material/Button'
 import Collapse from '@mui/material/Collapse'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
 import type { OrderCustomer } from '../types/order'
 import type { OrderItem } from '../types/order'
 import * as ordersApi from '../api/orders'
@@ -55,6 +59,8 @@ const orderLinkSx = {
 }
 
 export default function ClientsPage() {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [orders, setOrders] = useState<OrderItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -83,6 +89,112 @@ export default function ClientsPage() {
       <Box>
         <Typography variant="h5" fontWeight={600} sx={{ mb: 2 }}>Clientes</Typography>
         <Alert severity="error">{error}</Alert>
+      </Box>
+    )
+  }
+
+  if (isMobile) {
+    return (
+      <Box sx={{ maxWidth: '100%', boxSizing: 'border-box' }}>
+        <Typography variant="h5" fontWeight={600} sx={{ mb: 1 }}>
+          Clientes
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Lista de clientes a partir dos pedidos. Toque na linha para expandir e ver pedidos.
+        </Typography>
+
+        <Paper variant="outlined" sx={{ borderRadius: 3, overflow: 'hidden', maxWidth: '100%', boxSizing: 'border-box' }}>
+          <Box sx={{ bgcolor: 'action.hover', px: 1.5, py: 1, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: '1 1 80px', minWidth: 0 }}>Nome</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: '0 0 100px', maxWidth: '100%' }}>Contato</Typography>
+            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ flex: '0 0 72px', maxWidth: '100%' }}>Pedidos</Typography>
+            <Box sx={{ flex: '0 0 40px' }} aria-hidden />
+          </Box>
+          {clients.length === 0 ? (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Nenhum cliente encontrado. Os clientes aparecem aqui a partir dos pedidos cadastrados.
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              {clients.map(({ customer, orderIds }) => {
+                const rowKey = normalizePhone(customer.whatsapp) || `${customer.name}-${customer.email}`
+                const isExpanded = expandedClient === rowKey
+                return (
+                  <Fragment key={rowKey}>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={() => setExpandedClient((c) => (c === rowKey ? null : rowKey))}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedClient((c) => (c === rowKey ? null : rowKey)); } }}
+                      aria-expanded={isExpanded}
+                      sx={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                        px: 1.5,
+                        py: 1.25,
+                        border: 0,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        font: 'inherit',
+                        color: 'inherit',
+                        boxSizing: 'border-box',
+                        '&:last-of-type': { borderBottom: 0 },
+                        '&:hover': { bgcolor: 'action.hover' },
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, wordBreak: 'break-word', fontWeight: 500, fontSize: '0.875rem' }}>
+                        {customer.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ flex: '0 0 100px', maxWidth: '100%', fontSize: '0.75rem' }} noWrap>
+                        {customer.whatsapp || customer.email || '—'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ flex: '0 0 72px', fontSize: '0.75rem' }}>
+                        {orderIds.length} pedido{orderIds.length !== 1 ? 's' : ''}
+                      </Typography>
+                      <Box sx={{ width: 40, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }} aria-label={isExpanded ? 'Recolher' : 'Expandir'}>
+                        {isExpanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                      </Box>
+                    </Box>
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                      <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.default', px: 1.5, pb: 1.5, pt: 0.5 }}>
+                        <Paper variant="outlined" sx={{ bgcolor: 'grey.50', borderRadius: 2, p: 1.5, border: '1px solid', borderColor: 'divider' }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Email</Typography>
+                              <Typography variant="body2">{customer.email || '—'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Contato</Typography>
+                              <Typography variant="body2">{customer.whatsapp || '—'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Pedidos</Typography>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {orderIds.map((id) => (
+                                  <Link key={id} component={RouterLink} to={`/pedidos?id=${encodeURIComponent(id)}`} sx={orderLinkSx}>
+                                    {id}
+                                  </Link>
+                                ))}
+                              </Box>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Box>
+                    </Collapse>
+                  </Fragment>
+                )
+              })}
+            </Box>
+          )}
+        </Paper>
       </Box>
     )
   }
