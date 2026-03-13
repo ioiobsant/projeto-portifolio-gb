@@ -1,12 +1,10 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-
-const STORAGE_KEY = 'gba-auth'
-
-const CREDENTIALS = { login: 'admin', password: 'admin' }
+import * as authApi from '../api/auth'
+import { AUTH_TOKEN_KEY } from '../api/client'
 
 interface AuthContextValue {
   isAuthenticated: boolean
-  login: (username: string, password: string) => boolean
+  login: (loginValue: string, password: string) => Promise<boolean>
   logout: () => void
 }
 
@@ -20,7 +18,7 @@ export function useAuth(): AuthContextValue {
 
 function readStored(): boolean {
   try {
-    return sessionStorage.getItem(STORAGE_KEY) === 'true'
+    return !!sessionStorage.getItem(AUTH_TOKEN_KEY)
   } catch {
     return false
   }
@@ -29,24 +27,31 @@ function readStored(): boolean {
 export function AuthContextProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(readStored)
 
-  const login = useCallback((username: string, password: string) => {
-    const ok =
-      username.trim() === CREDENTIALS.login && password === CREDENTIALS.password
-    if (ok) {
-      sessionStorage.setItem(STORAGE_KEY, 'true')
+  const login = useCallback(async (loginValue: string, password: string): Promise<boolean> => {
+    try {
+      const { token } = await authApi.login(loginValue.trim(), password)
+      sessionStorage.setItem(AUTH_TOKEN_KEY, token)
       setIsAuthenticated(true)
+      return true
+    } catch {
+      // Acesso temporário em desenvolvimento: admin / admin
+      if (loginValue.trim() === 'admin' && password === 'admin') {
+        sessionStorage.setItem(AUTH_TOKEN_KEY, 'dev-admin')
+        setIsAuthenticated(true)
+        return true
+      }
+      return false
     }
-    return ok
   }, [])
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem(STORAGE_KEY)
+    sessionStorage.removeItem(AUTH_TOKEN_KEY)
     setIsAuthenticated(false)
   }, [])
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue !== 'true') setIsAuthenticated(false)
+      if (e.key === AUTH_TOKEN_KEY && e.newValue === null) setIsAuthenticated(false)
     }
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)

@@ -1,5 +1,15 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
+export const AUTH_TOKEN_KEY = 'gba-auth-token'
+
+function getStoredToken(): string | null {
+  try {
+    return sessionStorage.getItem(AUTH_TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
 type RequestOptions = RequestInit & { params?: Record<string, string> }
 
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -7,10 +17,12 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   const url = params
     ? `${API_BASE}${path}?${new URLSearchParams(params)}`
     : `${API_BASE}${path}`
+  const token = getStoredToken()
   const res = await fetch(url, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init.headers as HeadersInit),
     },
   })
