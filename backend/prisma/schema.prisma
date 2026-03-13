@@ -13,12 +13,27 @@ model Order {
   model           String
   productImageUrl String?
   size            String?
-  customer        Json     // { name, whatsapp, email }
-  specs           Json     // { hasPainting, paintColor?, paintFinish?, fabric?, foam?, base?, manufactureType }
+  customer        Json
+  specs           Json
   quantity        Int
-  saleValue       Int      // valor em centavos ou inteiro (ex: 18500)
-  deliveryDate    String   // ISO date "YYYY-MM-DD"
+  saleValue       Int
+  deliveryDate    String
   status          String
-  createdAt       String   // ISO date "YYYY-MM-DD"
+  createdAt       String
   notes           String?
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String?
+  phone        String?
+  passwordHash String
+  createdAt    String
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  identifier String
+  token      String
+  expiresAt  String
 }

@@ -1,15 +1,19 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 
 const app = express();
 const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-alterar-em-producao";
+const TOKEN_EXPIRY_MINUTES = 15;
+const SALT_ROUNDS = 10;
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-/** Formato de pedido igual ao frontend (OrderItem) */
 type OrderCustomer = { name: string; whatsapp: string; email: string };
 type OrderSpecs = {
   hasPainting: boolean;
@@ -69,7 +73,6 @@ function orderRecordToResponse(record: {
   };
 }
 
-/** GET /orders - Lista todos os pedidos */
 app.get("/orders", async (_req, res) => {
   try {
     const orders = await prisma.order.findMany({ orderBy: { createdAt: "desc" } });
@@ -80,7 +83,6 @@ app.get("/orders", async (_req, res) => {
   }
 });
 
-/** GET /orders/:id - Busca um pedido pelo id */
 app.get("/orders/:id", async (req, res) => {
   try {
     const order = await prisma.order.findUnique({ where: { id: req.params.id } });
@@ -92,7 +94,6 @@ app.get("/orders/:id", async (req, res) => {
   }
 });
 
-/** POST /orders - Cria um pedido */
 app.post("/orders", async (req, res) => {
   try {
     const body = req.body as OrderBody;
@@ -126,7 +127,6 @@ app.post("/orders", async (req, res) => {
   }
 });
 
-/** PUT /orders/:id - Atualiza um pedido */
 app.put("/orders/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -159,7 +159,6 @@ app.put("/orders/:id", async (req, res) => {
   }
 });
 
-/** DELETE /orders/:id - Remove um pedido */
 app.delete("/orders/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -170,6 +169,124 @@ app.delete("/orders/:id", async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Erro ao remover pedido" });
+  }
+});
+
+function normalizePhone(phone: string): string {
+  return (phone || "").replace(/\D/g, "");
+}
+
+function generateSixDigitCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+app.post("/auth/register/request", async (req, res) => {
+  try {
+    const { email, phone } = req.body as { email?: string; phone?: string };
+    const emailTrim = typeof email === "string" ? email.trim() : "";
+    const phoneNorm = normalizePhone(phone ?? "");
+    if (!emailTrim && !phoneNorm) {
+      return res.status(400).json({ error: "Informe o email ou o número de celular." });
+    }
+    const identifier = emailTrim ? emailTrim.toLowerCase() : phoneNorm;
+    const existingAdmin = await prisma.admin.findFirst({
+      where: emailTrim
+        ? { email: emailTrim.toLowerCase() }
+        : { phone: phoneNorm },
+    });
+    if (existingAdmin) {
+      return res.status(409).json({ error: "Já existe uma conta com esse email ou celular." });
+    }
+    await prisma.verificationToken.deleteMany({ where: { identifier } });
+    const token = generateSixDigitCode();
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MINUTES * 60 * 1000).toISOString();
+    await prisma.verificationToken.create({
+      data: { identifier, token, expiresAt },
+    });
+    console.log(`[Auth] Código de verificação para ${identifier}: ${token}`);
+    const isDev = process.env.NODE_ENV !== "production";
+    return res.status(200).json(
+      isDev ? { ok: true, devCode: token } : { ok: true }
+    );
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Erro ao enviar código." });
+  }
+});
+
+app.post("/auth/register/confirm", async (req, res) => {
+  try {
+    const { email, phone, token, password } = req.body as {
+      email?: string;
+      phone?: string;
+      token: string;
+      password: string;
+    };
+    const emailTrim = typeof email === "string" ? email.trim() : "";
+    const phoneNorm = normalizePhone(phone ?? "");
+    if (!emailTrim && !phoneNorm) {
+      return res.status(400).json({ error: "Informe o email ou o número de celular." });
+    }
+    if (!token || !password || password.length < 6) {
+      return res.status(400).json({ error: "Código e senha (mín. 6 caracteres) são obrigatórios." });
+    }
+    const identifier = emailTrim ? emailTrim.toLowerCase() : phoneNorm;
+    const record = await prisma.verificationToken.findFirst({
+      where: { identifier },
+      orderBy: { expiresAt: "desc" },
+    });
+    if (!record || record.token !== String(token).trim()) {
+      return res.status(400).json({ error: "Código inválido ou expirado." });
+    }
+    if (new Date(record.expiresAt) < new Date()) {
+      await prisma.verificationToken.deleteMany({ where: { identifier } });
+      return res.status(400).json({ error: "Código expirado. Solicite um novo." });
+    }
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const now = new Date().toISOString();
+    await prisma.admin.create({
+      data: {
+        email: emailTrim || null,
+        phone: phoneNorm || null,
+        passwordHash,
+        createdAt: now,
+      },
+    });
+    await prisma.verificationToken.deleteMany({ where: { identifier } });
+    return res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Erro ao criar conta." });
+  }
+});
+
+app.post("/auth/login", async (req, res) => {
+  try {
+    const { login, password } = req.body as { login: string; password: string };
+    const loginTrim = (login ?? "").trim();
+    const loginNorm = loginTrim.includes("@")
+      ? loginTrim.toLowerCase()
+      : normalizePhone(loginTrim);
+    if (!loginNorm || !password) {
+      return res.status(400).json({ error: "Login e senha são obrigatórios." });
+    }
+    const admin = await prisma.admin.findFirst({
+      where: loginTrim.includes("@")
+        ? { email: loginTrim.toLowerCase() }
+        : { phone: loginNorm },
+    });
+    if (!admin || !(await bcrypt.compare(password, admin.passwordHash))) {
+      return res.status(401).json({ error: "Login ou senha incorretos." });
+    }
+    const token = jwt.sign(
+      { sub: admin.id },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    return res.json({ token });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Erro ao fazer login." });
   }
 });
 
