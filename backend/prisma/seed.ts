@@ -3,7 +3,34 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-const orders = [
+type SeedOrder = {
+  id: string
+  category: string
+  model: string
+  productImageUrl: string
+  size: string
+  customer: {
+    name: string
+    whatsapp: string
+    email: string
+  }
+  specs: {
+    hasPainting: boolean
+    paintColor?: string
+    paintFinish?: string
+    fabric?: string
+    foam?: string
+    base?: string
+    manufactureType: 'Fabricação própria' | 'Reforma'
+  }
+  quantity: number
+  saleValue: number
+  deliveryDate: string
+  status: string
+  createdAt: string
+}
+
+const orders: SeedOrder[] = [
   {
     id: 'GBA-2023-0101',
     category: 'Sofá',
@@ -130,24 +157,90 @@ const orders = [
   },
 ]
 
+function normalizePhone(phone: string): string {
+  return (phone || '').replace(/\D/g, '')
+}
+
+function normalizeEmail(email: string): string | null {
+  const normalized = (email || '').trim().toLowerCase()
+  return normalized || null
+}
+
+function splitName(name: string): { firstName: string; lastName: string } {
+  const safe = (name || '').trim().replace(/\s+/g, ' ')
+  if (!safe) {
+    return { firstName: 'Cliente', lastName: 'Sem sobrenome' }
+  }
+  const [firstName, ...rest] = safe.split(' ')
+  return {
+    firstName,
+    lastName: rest.join(' ') || 'Sem sobrenome',
+  }
+}
+
 async function main() {
   await prisma.order.deleteMany()
-  await prisma.order.createMany({
-    data: orders.map((o) => ({
-      id: o.id,
-      category: o.category,
-      model: o.model,
-      productImageUrl: o.productImageUrl,
-      size: o.size,
-      customer: o.customer as object,
-      specs: o.specs as object,
-      quantity: o.quantity,
-      saleValue: o.saleValue,
-      deliveryDate: o.deliveryDate,
-      status: o.status,
-      createdAt: o.createdAt,
-    })),
-  })
+  await prisma.customer.deleteMany()
+
+  for (const order of orders) {
+    const now = new Date().toISOString()
+    const phone = normalizePhone(order.customer.whatsapp)
+    const email = normalizeEmail(order.customer.email)
+    const { firstName, lastName } = splitName(order.customer.name)
+
+    if (!phone && !email) {
+      throw new Error(`Pedido ${order.id} sem email e celular do cliente.`)
+    }
+
+    const existingCustomer = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          ...(phone ? [{ phone }] : []),
+          ...(email ? [{ email }] : []),
+        ],
+      },
+    })
+
+    const customer = existingCustomer
+      ? await prisma.customer.update({
+          where: { id: existingCustomer.id },
+          data: {
+            firstName,
+            lastName,
+            phone: phone || existingCustomer.phone,
+            email,
+            updatedAt: now,
+          },
+        })
+      : await prisma.customer.create({
+          data: {
+            firstName,
+            lastName,
+            phone: phone || `seed-${order.id}`,
+            email,
+            createdAt: now,
+            updatedAt: now,
+          },
+        })
+
+    await prisma.order.create({
+      data: {
+        id: order.id,
+        category: order.category,
+        model: order.model,
+        productImageUrl: order.productImageUrl,
+        size: order.size,
+        customerId: customer.id,
+        specs: order.specs as object,
+        quantity: order.quantity,
+        saleValue: order.saleValue,
+        deliveryDate: order.deliveryDate,
+        status: order.status,
+        createdAt: order.createdAt,
+      },
+    })
+  }
+
   console.log('Seed concluído: %d pedidos criados.', orders.length)
 }
 

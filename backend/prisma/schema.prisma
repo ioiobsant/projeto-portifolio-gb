@@ -13,7 +13,8 @@ model Order {
   model           String
   productImageUrl String?
   size            String?
-  customer        Json
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   specs           Json
   quantity        Int
   saleValue       Int
@@ -21,19 +22,32 @@ model Order {
   status          String
   createdAt       String
   notes           String?
+
+  @@index([customerId])
+}
+
+model Customer {
+  id        String  @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String? @unique
+  phone     String  @unique
+  createdAt String
+  updatedAt String
+  orders    Order[]
 }
 
 model Admin {
   id           String   @id @default(cuid())
-  email        String?
-  phone        String?
+  email        String?  @unique
+  phone        String?  @unique
   passwordHash String
   createdAt    String
 }
 
 model VerificationToken {
   id         String   @id @default(cuid())
-  identifier String
+  identifier String   @unique
   token      String
   expiresAt  String
 }
