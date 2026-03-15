@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes, Outlet } from 'react-router-dom'
+import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
 import AdminLayout from '../layouts/AdminLayout.tsx'
 import DashboardPage from '../pages/DashboardPage.tsx'
 import OrdersPage from '../pages/OrdersPage.tsx'
@@ -10,7 +12,16 @@ import NotFoundPage from '../pages/NotFoundPage.tsx'
 import { useAuth } from '../contexts/AuthContext'
 
 function ProtectedRoute() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isBootstrapping } = useAuth()
+
+  if (isBootstrapping) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <CircularProgress size={28} />
+      </Box>
+    )
+  }
+
   if (!isAuthenticated) return <Navigate to="/login" replace />
   return <Outlet />
 }

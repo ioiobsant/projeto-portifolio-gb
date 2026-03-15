@@ -121,8 +121,8 @@ function AdminLayout() {
 
   const handleDrawerToggle = () => setMobileOpen((v) => !v)
   const handleNav = (path: string) => navigate(path)
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login', { replace: true })
   }
 
@@ -130,7 +130,7 @@ function AdminLayout() {
     <SidebarContent
       onNavigate={handleNav}
       onItemClick={isDesktop ? undefined : handleDrawerToggle}
-      onLogout={handleLogout}
+      onLogout={() => { void handleLogout() }}
     />
   )
 

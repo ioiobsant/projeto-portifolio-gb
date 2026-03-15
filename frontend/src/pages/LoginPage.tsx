@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -11,118 +11,129 @@ import { useAuth } from '../contexts/AuthContext'
 import * as authApi from '../api/auth'
 import { formatBrazilianPhone } from '../utils/phone'
 
-type Mode = 'login' | 'register-step1' | 'register-step2'
+type Mode = 'login' | 'register' | 'activate'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const { isAuthenticated, login } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
+
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [loading, setLoading] = useState(false)
 
   const [registerEmail, setRegisterEmail] = useState('')
   const [registerPhone, setRegisterPhone] = useState('')
-  const [registerCode, setRegisterCode] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
   const [registerConfirm, setRegisterConfirm] = useState('')
-  const [devCode, setDevCode] = useState<string | null>(null)
+
+  const [activationToken, setActivationToken] = useState('')
+  const [devActivationToken, setDevActivationToken] = useState<string | null>(null)
+
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (isAuthenticated) navigate('/', { replace: true })
   }, [isAuthenticated, navigate])
 
+  const resetAlerts = () => {
+    setError('')
+    setSuccess('')
+  }
+
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
+    resetAlerts()
     setLoading(true)
     try {
       const ok = await login(loginValue.trim(), password)
-      if (ok) navigate('/', { replace: true })
-      else setError('Login ou senha incorretos.')
+      if (ok) {
+        navigate('/', { replace: true })
+      } else {
+        setError('Login ou senha incorretos.')
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRegisterRequest = async (e: FormEvent) => {
+  const handleRegisterSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
-    setDevCode(null)
+    resetAlerts()
+
     const email = registerEmail.trim()
-    const phone = registerPhone.replace(/\D/g, '')
-    if (!email && !phone) {
-      setError('Informe o email ou o número de celular.')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await authApi.requestRegisterCode(
-        email ? { email } : { phone: registerPhone.trim() }
-      )
-      setDevCode(res.devCode ?? null)
-      setMode('register-step2')
-      setSuccess('Código enviado. Verifique seu email ou celular.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao enviar código.')
-    } finally {
-      setLoading(false)
-    }
-  }
+    const phoneDigits = registerPhone.replace(/\D/g, '')
 
-  const handleRegisterConfirm = async (e: FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (registerPassword.length < 6) {
-      setError('A senha deve ter no mínimo 6 caracteres.')
+    if (!email && !phoneDigits) {
+      setError('Informe email ou celular.')
       return
     }
+
+    if (registerPassword.length < 8) {
+      setError('A senha deve ter no minimo 8 caracteres.')
+      return
+    }
+
     if (registerPassword !== registerConfirm) {
-      setError('As senhas não coincidem.')
+      setError('As senhas nao coincidem.')
       return
     }
-    const email = registerEmail.trim()
+
     setLoading(true)
     try {
-      await authApi.confirmRegister({
+      const response = await authApi.register({
         ...(email ? { email } : { phone: registerPhone.trim() }),
-        token: registerCode.trim(),
         password: registerPassword,
       })
-      setSuccess('Conta criada. Faça login com sua senha.')
-      setLoginValue(email || registerPhone.trim())
-      setPassword('')
-      setMode('login')
-      setRegisterCode('')
-      setRegisterPassword('')
-      setRegisterConfirm('')
-      setDevCode(null)
+
+      setDevActivationToken(response.activationToken ?? null)
+      setActivationToken(response.activationToken ?? '')
+      setSuccess('Cadastro criado. Ative sua conta para fazer login.')
+      setMode('activate')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta.')
+      setError(err instanceof Error ? err.message : 'Erro ao registrar conta.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleActivateSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    resetAlerts()
+
+    if (!activationToken.trim()) {
+      setError('Informe o token de ativacao.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await authApi.activate(activationToken.trim())
+      setSuccess('Conta ativada com sucesso. Agora faca login.')
+      setMode('login')
+      setLoginValue(registerEmail.trim() || registerPhone.trim())
+      setPassword('')
+      setActivationToken('')
+      setDevActivationToken(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao ativar conta.')
     } finally {
       setLoading(false)
     }
   }
 
   const goToLogin = () => {
+    resetAlerts()
     setMode('login')
-    setError('')
-    setSuccess('')
-    setDevCode(null)
+    setDevActivationToken(null)
   }
 
   const goToRegister = () => {
-    setMode('register-step1')
-    setRegisterEmail('')
-    setRegisterPhone('')
-    setRegisterCode('')
-    setRegisterPassword('')
-    setRegisterConfirm('')
-    setError('')
-    setSuccess('')
-    setDevCode(null)
+    resetAlerts()
+    setMode('register')
+    setActivationToken('')
+    setDevActivationToken(null)
   }
 
   return (
@@ -142,7 +153,7 @@ export default function LoginPage() {
           p: 3,
           borderRadius: 3,
           width: '100%',
-          maxWidth: 400,
+          maxWidth: 420,
           boxShadow: 2,
         }}
       >
@@ -150,18 +161,18 @@ export default function LoginPage() {
           <Box
             component="img"
             src="/genice-brandao-atelier-logo.png"
-            alt="Genice Brandão Atelier"
+            alt="Genice Brandao Atelier"
             sx={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', mb: 2 }}
           />
           <Typography variant="h5" fontWeight={600}>
-            {mode === 'login' ? 'Entrar' : 'Cadastrar administrador'}
+            {mode === 'login' ? 'Entrar' : mode === 'register' ? 'Criar conta' : 'Ativar conta'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {mode === 'login'
               ? 'Acesso ao painel administrativo'
-              : mode === 'register-step1'
-                ? 'Informe email ou celular para receber o código'
-                : 'Digite o código recebido e defina sua senha'}
+              : mode === 'register'
+                ? 'Cadastre email ou celular e defina sua senha'
+                : 'Informe o token de ativacao para liberar o acesso'}
           </Typography>
         </Box>
 
@@ -191,7 +202,7 @@ export default function LoginPage() {
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 1 }}>
-              Não tem conta?{' '}
+              Nao tem conta?{' '}
               <Link component="button" type="button" variant="body2" onClick={goToRegister} sx={{ cursor: 'pointer' }}>
                 Cadastrar administrador
               </Link>
@@ -199,8 +210,8 @@ export default function LoginPage() {
           </Box>
         )}
 
-        {mode === 'register-step1' && (
-          <Box component="form" onSubmit={handleRegisterRequest} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {mode === 'register' && (
+          <Box component="form" onSubmit={handleRegisterSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Email"
               type="email"
@@ -211,7 +222,7 @@ export default function LoginPage() {
               fullWidth
             />
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-              — ou —
+              ou
             </Typography>
             <TextField
               label="Celular (com DDD)"
@@ -222,34 +233,8 @@ export default function LoginPage() {
               inputProps={{ inputMode: 'numeric', maxLength: 16 }}
               fullWidth
             />
-            {error && <Alert severity="error">{error}</Alert>}
-            <Button type="submit" variant="contained" size="medium" fullWidth sx={{ mt: 1 }} disabled={loading}>
-              {loading ? 'Enviando...' : 'Enviar código'}
-            </Button>
-            <Button type="button" variant="text" size="small" fullWidth onClick={goToLogin}>
-              Voltar ao login
-            </Button>
-          </Box>
-        )}
-
-        {mode === 'register-step2' && (
-          <Box component="form" onSubmit={handleRegisterConfirm} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Código de verificação (6 dígitos)"
-              size="small"
-              value={registerCode}
-              onChange={(e) => setRegisterCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              fullWidth
-              inputProps={{ maxLength: 6 }}
-            />
-            {devCode && (
-              <Alert severity="info">
-                Em desenvolvimento: use o código <strong>{devCode}</strong> (também no console do backend).
-              </Alert>
-            )}
-            <TextField
-              label="Senha (mín. 6 caracteres)"
+              label="Senha (minimo 8 caracteres)"
               type="password"
               size="small"
               value={registerPassword}
@@ -267,10 +252,37 @@ export default function LoginPage() {
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
             <Button type="submit" variant="contained" size="medium" fullWidth sx={{ mt: 1 }} disabled={loading}>
-              {loading ? 'Criando conta...' : 'Criar conta'}
+              {loading ? 'Registrando...' : 'Registrar e receber token'}
             </Button>
-            <Button type="button" variant="text" size="small" fullWidth onClick={() => setMode('register-step1')}>
-              Voltar
+            <Button type="button" variant="text" size="small" fullWidth onClick={goToLogin}>
+              Voltar ao login
+            </Button>
+          </Box>
+        )}
+
+        {mode === 'activate' && (
+          <Box component="form" onSubmit={handleActivateSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Token de ativacao"
+              size="small"
+              value={activationToken}
+              onChange={(e) => setActivationToken(e.target.value)}
+              placeholder="Cole o token recebido"
+              fullWidth
+              autoFocus
+            />
+            {devActivationToken && (
+              <Alert severity="info">
+                Em desenvolvimento: use o token <strong>{devActivationToken}</strong> (tambem no console do backend).
+              </Alert>
+            )}
+            {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
+            <Button type="submit" variant="contained" size="medium" fullWidth sx={{ mt: 1 }} disabled={loading}>
+              {loading ? 'Ativando...' : 'Ativar conta'}
+            </Button>
+            <Button type="button" variant="text" size="small" fullWidth onClick={goToRegister}>
+              Voltar ao cadastro
             </Button>
           </Box>
         )}
