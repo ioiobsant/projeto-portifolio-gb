@@ -38,16 +38,45 @@ model Customer {
 }
 
 model Admin {
-  id           String   @id @default(cuid())
-  email        String?  @unique
-  phone        String?  @unique
-  passwordHash String
-  createdAt    String
+  id               String            @id @default(cuid())
+  email            String?           @unique
+  phone            String?           @unique
+  passwordHash     String
+  isActive         Boolean           @default(false)
+  createdAt        String
+  updatedAt        String
+  activationTokens ActivationToken[]
+  refreshSessions  RefreshSession[]
 }
 
-model VerificationToken {
-  id         String   @id @default(cuid())
-  identifier String   @unique
-  token      String
-  expiresAt  String
+model ActivationToken {
+  id        String  @id @default(cuid())
+  adminId   String
+  tokenHash String  @unique
+  expiresAt String
+  consumedAt String?
+  createdAt String
+  admin     Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
+model RefreshSession {
+  id                  String  @id @default(cuid())
+  adminId             String
+  tokenHash           String  @unique
+  csrfTokenHash       String
+  userAgent           String?
+  ipAddress           String?
+  expiresAt           String
+  revokedAt           String?
+  replacedBySessionId String?
+  createdAt           String
+  lastUsedAt          String?
+  admin               Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }
