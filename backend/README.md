@@ -1,6 +1,6 @@
-# Backend - CRUD de Pedidos
+# Backend - Pedidos, Clientes e JWT
 
-API REST com Express e Prisma ORM, compatível com os dados de pedido do frontend.
+API REST com Express e Prisma ORM, com autenticação JWT e modelagem relacional entre `Order` e `Customer`.
 
 ## Pré-requisitos
 
@@ -21,7 +21,7 @@ API REST com Express e Prisma ORM, compatível com os dados de pedido do fronten
    cp .env.example .env
    ```
 
-   Ajuste `DATABASE_URL` se quiser outro caminho para o SQLite.
+   Ajuste `DATABASE_URL` se quiser outro caminho para o SQLite e defina `JWT_SECRET`.
 
 3. Gere o cliente Prisma e aplique as migrations:
 
@@ -50,13 +50,22 @@ A API estará em `http://localhost:3001`.
 
 | Método | Rota           | Descrição              |
 |--------|----------------|------------------------|
-| GET    | /orders        | Lista todos os pedidos |
-| GET    | /orders/:id    | Busca um pedido        |
-| POST   | /orders        | Cria um pedido         |
-| PUT    | /orders/:id    | Atualiza um pedido     |
-| DELETE | /orders/:id    | Remove um pedido       |
+| POST   | /auth/register/request | Solicita código de cadastro de admin |
+| POST   | /auth/register/confirm | Confirma cadastro de admin |
+| POST   | /auth/login | Login e emissão de JWT |
+| GET    | /auth/me | Retorna admin autenticado |
+| GET    | /orders | Lista todos os pedidos (protegido) |
+| GET    | /orders/:id | Busca um pedido (protegido) |
+| POST   | /orders | Cria um pedido (protegido) |
+| PUT    | /orders/:id | Atualiza um pedido (protegido) |
+| DELETE | /orders/:id | Remove um pedido (protegido) |
+| GET    | /customers/lookup?email=&phone= | Busca cliente por email/celular (protegido) |
 
-O corpo das requisições (POST/PUT) segue o tipo `OrderItem` do frontend (id, category, model, customer, specs, quantity, saleValue, deliveryDate, status, createdAt, etc.).
+As rotas protegidas exigem header `Authorization: Bearer <jwt>`.
+
+O corpo das requisições de pedido (POST/PUT) segue o tipo `OrderItem` do frontend (`customer` continua no payload/response para compatibilidade), mas internamente o backend persiste cliente em tabela própria (`Customer`) e relaciona por `customerId`.
+
+No fluxo de novo pedido, é possível identificar cliente existente por celular/email com `GET /customers/lookup`, permitindo preencher automaticamente nome e sobrenome quando já houver cadastro.
 
 ## Scripts
 
