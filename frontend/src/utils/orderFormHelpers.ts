@@ -91,10 +91,6 @@ export function generateNextOrderIdForClient(
   return generateRandomOrderId(orders, basePrefix)
 }
 
-function fullName(first: string, last: string): string {
-  return `${first.trim()} ${last.trim()}`.trim()
-}
-
 export function createInitialOrderForm(orders: OrderItem[], idPrefix?: string): NewOrderForm {
   return {
     id: generateRandomOrderId(orders, idPrefix),

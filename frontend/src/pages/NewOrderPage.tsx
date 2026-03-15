@@ -43,6 +43,9 @@ export default function NewOrderPage() {
   const [form, setForm] = useState<NewOrderForm | null>(null)
   const [submitError, setSubmitError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [customerLookupInfo, setCustomerLookupInfo] = useState('')
+  const [customerLookupError, setCustomerLookupError] = useState('')
+  const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
 
   useEffect(() => {
     const settings = loadSettings()
@@ -80,6 +83,57 @@ export default function NewOrderPage() {
     if (!form) return
     const prefix = loadSettings().orderIdPrefix
     setForm((prev) => (prev ? { ...prev, id: generateRandomOrderId(orders, prefix) } : null))
+  }
+
+  const handleCustomerLookup = async () => {
+    if (!form) return
+
+    const email = form.customerEmail.trim()
+    const phone = form.customerContact.trim()
+    const phoneDigits = phone.replace(/\D/g, '')
+
+    if (!email && phoneDigits.length < 10) {
+      setCustomerLookupInfo('')
+      setCustomerLookupError('')
+      return
+    }
+
+    setCustomerLookupLoading(true)
+    setCustomerLookupError('')
+
+    try {
+      const result = await ordersApi.lookupCustomer({
+        ...(email ? { email } : {}),
+        ...(phone ? { phone } : {}),
+      })
+
+      if (!result.found || !result.customer) {
+        setCustomerLookupInfo('')
+        return
+      }
+
+      setForm((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          customerFirstName: result.customer?.firstName || prev.customerFirstName,
+          customerLastName: result.customer?.lastName || prev.customerLastName,
+          customerEmail: result.customer?.email || prev.customerEmail,
+          customerContact: result.customer?.whatsapp
+            ? formatBrazilianPhone(result.customer.whatsapp)
+            : prev.customerContact,
+        }
+      })
+
+      setCustomerLookupInfo(
+        `Cliente identificado: ${result.customer.firstName} ${result.customer.lastName}`
+      )
+    } catch (e) {
+      setCustomerLookupInfo('')
+      setCustomerLookupError(e instanceof Error ? e.message : 'Erro ao buscar cliente.')
+    } finally {
+      setCustomerLookupLoading(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -211,19 +265,49 @@ export default function NewOrderPage() {
             type="email"
             size="small"
             value={form.customerEmail}
-            onChange={(e) => handleFieldChange('customerEmail', e.target.value)}
+            onChange={(e) => {
+              setCustomerLookupInfo('')
+              setCustomerLookupError('')
+              handleFieldChange('customerEmail', e.target.value)
+            }}
+            onBlur={handleCustomerLookup}
             fullWidth
           />
           <TextField
             label="Contato (telefone/WhatsApp) *"
             size="small"
             value={form.customerContact}
-            onChange={(e) => handleFieldChange('customerContact', formatBrazilianPhone(e.target.value))}
+            onChange={(e) => {
+              setCustomerLookupInfo('')
+              setCustomerLookupError('')
+              handleFieldChange('customerContact', formatBrazilianPhone(e.target.value))
+            }}
+            onBlur={handleCustomerLookup}
             placeholder="Ex.: (11) 99999-0000"
             inputProps={{ inputMode: 'numeric', maxLength: 16 }}
             fullWidth
           />
         </Box>
+
+        {(customerLookupLoading || customerLookupInfo || customerLookupError) && (
+          <Box sx={{ mt: 1 }}>
+            {customerLookupLoading && (
+              <Typography variant="body2" color="text.secondary">
+                Buscando cliente cadastrado...
+              </Typography>
+            )}
+            {!customerLookupLoading && customerLookupInfo && !customerLookupError && (
+              <Typography variant="body2" color="success.main">
+                {customerLookupInfo}
+              </Typography>
+            )}
+            {!customerLookupLoading && customerLookupError && (
+              <Typography variant="body2" color="error.main">
+                {customerLookupError}
+              </Typography>
+            )}
+          </Box>
+        )}
 
         <Divider sx={{ my: 3 }} />
 

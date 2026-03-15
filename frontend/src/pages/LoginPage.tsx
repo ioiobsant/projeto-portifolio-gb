@@ -84,7 +84,6 @@ export default function LoginPage() {
       return
     }
     const email = registerEmail.trim()
-    const phone = registerPhone.replace(/\D/g, '')
     setLoading(true)
     try {
       await authApi.confirmRegister({

@@ -34,12 +34,6 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(true)
       return true
     } catch {
-      // Acesso temporário em desenvolvimento: admin / admin
-      if (loginValue.trim() === 'admin' && password === 'admin') {
-        sessionStorage.setItem(AUTH_TOKEN_KEY, 'dev-admin')
-        setIsAuthenticated(true)
-        return true
-      }
       return false
     }
   }, [])
