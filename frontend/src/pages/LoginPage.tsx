@@ -9,7 +9,6 @@ import Alert from '@mui/material/Alert'
 import Link from '@mui/material/Link'
 import { useAuth } from '../contexts/AuthContext'
 import * as authApi from '../api/auth'
-import { formatBrazilianPhone } from '../utils/phone'
 
 type Mode = 'login' | 'register' | 'activate'
 
@@ -22,7 +21,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
 
   const [registerEmail, setRegisterEmail] = useState('')
-  const [registerPhone, setRegisterPhone] = useState('')
   const [registerPassword, setRegisterPassword] = useState('')
   const [registerConfirm, setRegisterConfirm] = useState('')
 
@@ -63,10 +61,9 @@ export default function LoginPage() {
     resetAlerts()
 
     const email = registerEmail.trim()
-    const phoneDigits = registerPhone.replace(/\D/g, '')
 
-    if (!email && !phoneDigits) {
-      setError('Informe email ou celular.')
+    if (!email) {
+      setError('Informe um email valido.')
       return
     }
 
@@ -83,7 +80,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const response = await authApi.register({
-        ...(email ? { email } : { phone: registerPhone.trim() }),
+        email,
         password: registerPassword,
       })
 
@@ -112,7 +109,7 @@ export default function LoginPage() {
       await authApi.activate(activationToken.trim())
       setSuccess('Conta ativada com sucesso. Agora faca login.')
       setMode('login')
-      setLoginValue(registerEmail.trim() || registerPhone.trim())
+      setLoginValue(registerEmail.trim())
       setPassword('')
       setActivationToken('')
       setDevActivationToken(null)
@@ -171,7 +168,7 @@ export default function LoginPage() {
             {mode === 'login'
               ? 'Acesso ao painel administrativo'
               : mode === 'register'
-                ? 'Cadastre email ou celular e defina sua senha'
+                ? 'Cadastre seu email e defina sua senha'
                 : 'Informe o token de ativacao para liberar o acesso'}
           </Typography>
         </Box>
@@ -179,7 +176,7 @@ export default function LoginPage() {
         {mode === 'login' && (
           <Box component="form" onSubmit={handleLoginSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Email ou celular"
+              label="Email"
               size="small"
               value={loginValue}
               onChange={(e) => setLoginValue(e.target.value)}
@@ -218,19 +215,7 @@ export default function LoginPage() {
               size="small"
               value={registerEmail}
               onChange={(e) => setRegisterEmail(e.target.value)}
-              placeholder="ou use o celular abaixo"
-              fullWidth
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-              ou
-            </Typography>
-            <TextField
-              label="Celular (com DDD)"
-              size="small"
-              value={registerPhone}
-              onChange={(e) => setRegisterPhone(formatBrazilianPhone(e.target.value))}
-              placeholder="(11) 99999-0000"
-              inputProps={{ inputMode: 'numeric', maxLength: 16 }}
+              autoFocus
               fullWidth
             />
             <TextField
