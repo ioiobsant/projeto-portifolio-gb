@@ -4,6 +4,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt, { type JwtPayload } from "jsonwebtoken";
+import nodemailer from "nodemailer";
 import { Prisma, PrismaClient } from "@prisma/client";
 
 const app = express();
@@ -19,6 +20,13 @@ const ACCESS_TOKEN_TTL_MINUTES = Number(process.env.ACCESS_TOKEN_TTL_MINUTES ?? 
 const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7);
 const ACTIVATION_TOKEN_TTL_MINUTES = Number(process.env.ACTIVATION_TOKEN_TTL_MINUTES ?? 30);
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 12);
+
+const SMTP_HOST = process.env.SMTP_HOST ?? "";
+const SMTP_PORT = Number(process.env.SMTP_PORT ?? 587);
+const SMTP_SECURE = process.env.SMTP_SECURE === "true";
+const SMTP_USER = process.env.SMTP_USER ?? "";
+const SMTP_PASS = process.env.SMTP_PASS ?? "";
+const SMTP_FROM = process.env.SMTP_FROM ?? SMTP_USER;
 
 const ACCESS_COOKIE_NAME = "gba_access";
 const REFRESH_COOKIE_NAME = "gba_refresh";
@@ -196,6 +204,52 @@ function generateOpaqueToken(size = 48): string {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function buildActivationLink(token: string): string {
+  const baseUrl = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+  return `${baseUrl}/ativar?token=${encodeURIComponent(token)}`;
+}
+
+async function sendActivationEmail(to: string, token: string): Promise<void> {
+  const activationLink = buildActivationLink(token);
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.log(`[Auth] Token de ativação para ${to}: ${token}`);
+    console.log(`[Auth] Link de ativação: ${activationLink}`);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+
+  await transporter.sendMail({
+    from: SMTP_FROM || SMTP_USER,
+    to,
+    subject: "Ative sua conta — Genice Brandão Atelier",
+    text: `Olá!\n\nUse o código abaixo para ativar sua conta (válido por ${ACTIVATION_TOKEN_TTL_MINUTES} minutos):\n\n${token}\n\nOu acesse o link direto:\n${activationLink}\n\nSe você não solicitou esse cadastro, ignore este e-mail.`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#b06a3a">Genice Brandão Atelier</h2>
+        <p>Olá! Para ativar sua conta, use o código abaixo:</p>
+        <div style="background:#f5f0eb;padding:16px 24px;border-radius:8px;text-align:center;font-size:24px;letter-spacing:4px;font-weight:bold;color:#3d1f0a">
+          ${token}
+        </div>
+        <p style="margin-top:16px">Ou clique no botão para ativar diretamente:</p>
+        <a href="${activationLink}" style="display:inline-block;margin-top:8px;padding:10px 24px;background:#b06a3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold">
+          Ativar minha conta
+        </a>
+        <p style="margin-top:24px;font-size:12px;color:#888">
+          Este código expira em ${ACTIVATION_TOKEN_TTL_MINUTES} minutos.<br>
+          Se você não solicitou esse cadastro, ignore este e-mail.
+        </p>
+      </div>
+    `,
+  });
 }
 
 function addMinutes(date: Date, minutes: number): Date {
@@ -653,17 +707,15 @@ app.delete("/orders/:id", async (req, res) => {
 
 app.post("/auth/register", async (req, res) => {
   try {
-    const { email, phone, password } = req.body as {
+    const { email, password } = req.body as {
       email?: string;
-      phone?: string;
       password?: string;
     };
 
     const emailNorm = normalizeEmail(email ?? "");
-    const phoneNorm = normalizePhone(phone ?? "");
 
-    if (!emailNorm && !phoneNorm) {
-      throw new HttpError(400, "Informe email ou celular.");
+    if (!emailNorm) {
+      throw new HttpError(400, "Informe um email valido.");
     }
 
     if (!password || password.length < 8) {
@@ -671,16 +723,11 @@ app.post("/auth/register", async (req, res) => {
     }
 
     const existingAdmin = await prisma.admin.findFirst({
-      where: {
-        OR: [
-          ...(emailNorm ? [{ email: emailNorm }] : []),
-          ...(phoneNorm ? [{ phone: phoneNorm }] : []),
-        ],
-      },
+      where: { email: emailNorm },
     });
 
     if (existingAdmin?.isActive) {
-      throw new HttpError(409, "Ja existe uma conta ativa com esse email ou celular.");
+      throw new HttpError(409, "Ja existe uma conta ativa com esse email.");
     }
 
     const now = nowIso();
@@ -690,8 +737,7 @@ app.post("/auth/register", async (req, res) => {
       ? await prisma.admin.update({
           where: { id: existingAdmin.id },
           data: {
-            email: emailNorm || null,
-            phone: phoneNorm || null,
+            email: emailNorm,
             passwordHash,
             isActive: false,
             updatedAt: now,
@@ -699,8 +745,7 @@ app.post("/auth/register", async (req, res) => {
         })
       : await prisma.admin.create({
           data: {
-            email: emailNorm || null,
-            phone: phoneNorm || null,
+            email: emailNorm,
             passwordHash,
             isActive: false,
             createdAt: now,
@@ -722,7 +767,7 @@ app.post("/auth/register", async (req, res) => {
       },
     });
 
-    console.log(`[Auth] Token de ativacao para ${emailNorm || phoneNorm}: ${activationToken}`);
+    await sendActivationEmail(emailNorm, activationToken);
 
     return res.status(201).json(
       IS_PROD
