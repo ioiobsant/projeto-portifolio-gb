@@ -14,7 +14,6 @@ model Order {
   productImageUrl String?
   size            String?
   customerId      String
-  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   specs           Json
   quantity        Int
   saleValue       Int
@@ -22,6 +21,7 @@ model Order {
   status          String
   createdAt       String
   notes           String?
+  customer        Customer @relation(fields: [customerId], references: [id])
 
   @@index([customerId])
 }
@@ -42,21 +42,21 @@ model Admin {
   email            String?           @unique
   phone            String?           @unique
   passwordHash     String
-  isActive         Boolean           @default(false)
   createdAt        String
-  updatedAt        String
+  isActive         Boolean           @default(false)
+  updatedAt        String            @default("")
   activationTokens ActivationToken[]
   refreshSessions  RefreshSession[]
 }
 
 model ActivationToken {
-  id        String  @id @default(cuid())
-  adminId   String
-  tokenHash String  @unique
-  expiresAt String
+  id         String  @id @default(cuid())
+  adminId    String
+  tokenHash  String  @unique
+  expiresAt  String
   consumedAt String?
-  createdAt String
-  admin     Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt  String
+  admin      Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
   @@index([expiresAt])
@@ -74,7 +74,7 @@ model RefreshSession {
   replacedBySessionId String?
   createdAt           String
   lastUsedAt          String?
-  admin               Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  admin               Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
   @@index([expiresAt])
