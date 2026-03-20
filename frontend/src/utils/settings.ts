@@ -8,9 +8,29 @@ export interface AppSettings {
   themeMode: ThemeMode
 }
 
+const MONTH_INITIALS = [
+  'JAN',
+  'FEV',
+  'MAR',
+  'ABR',
+  'MAI',
+  'JUN',
+  'JUL',
+  'AGO',
+  'SET',
+  'OUT',
+  'NOV',
+  'DEZ',
+] as const
+
+function getCurrentMonthInitials(): (typeof MONTH_INITIALS)[number] {
+  const m = new Date().getMonth()
+  return MONTH_INITIALS[m] ?? 'JAN'
+}
+
 const defaults: AppSettings = {
   businessName: 'Genice Brandão Atelier',
-  orderIdPrefix: 'GBA',
+  orderIdPrefix: getCurrentMonthInitials(),
   themeMode: 'light',
 }
 
@@ -22,7 +42,10 @@ export function loadSettings(): AppSettings {
     const themeMode = parsed.themeMode === 'dark' ? 'dark' : 'light'
     return {
       businessName: typeof parsed.businessName === 'string' ? parsed.businessName : defaults.businessName,
-      orderIdPrefix: typeof parsed.orderIdPrefix === 'string' ? parsed.orderIdPrefix.trim() || defaults.orderIdPrefix : defaults.orderIdPrefix,
+      orderIdPrefix:
+        typeof parsed.orderIdPrefix === 'string' && MONTH_INITIALS.includes(parsed.orderIdPrefix.trim().toUpperCase() as (typeof MONTH_INITIALS)[number])
+          ? parsed.orderIdPrefix.trim().toUpperCase()
+          : defaults.orderIdPrefix,
       themeMode,
     }
   } catch {
