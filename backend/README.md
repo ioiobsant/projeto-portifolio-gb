@@ -21,7 +21,7 @@ API REST com Express e Prisma ORM, com autenticacao baseada em cookies (access t
    cp .env.example .env
    ```
 
-   Ajuste `DATABASE_URL` se quiser outro caminho para o SQLite e configure `JWT_SECRET`, `CORS_ORIGIN` e duracoes dos tokens.
+   Ajuste `DATABASE_URL` se quiser outro caminho para o SQLite. Configure `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_EMAIL` e, para definir a senha do admin de forma segura, `ADMIN_PASSWORD_HASH` (hash bcrypt; se vazio, o seed usa a senha temporária "TempPassword1!" — use "Esqueci minha senha" no primeiro acesso para definir a definitiva).
 
 3. Gere o cliente Prisma e aplique as migrations:
 
@@ -32,7 +32,7 @@ API REST com Express e Prisma ORM, com autenticacao baseada em cookies (access t
 
    Na primeira vez, isso cria o banco e aplica a migration `init`. Em produção ou em outro ambiente, use `npx prisma migrate deploy`.
 
-4. (Opcional) Popule o banco com dados de exemplo:
+4. Rode o seed para criar o admin único e (opcionalmente) dados de exemplo:
 
    ```bash
    npm run db:seed
@@ -50,9 +50,13 @@ A API estará em `http://localhost:3001`.
 
 | Metodo | Rota | Descricao |
 |--------|------|-----------|
-| POST   | /auth/register | Cria conta inativa e gera token de ativacao |
-| POST   | /auth/activate | Ativa conta com token valido |
-| POST   | /auth/login | Cria cookies de sessao (access, refresh e csrf) |
+| POST   | /auth/login | Login com email e senha; cria cookies de sessao (qualquer admin ativo) |
+| POST   | /auth/forgot-password | Envia token de redefinicao por e-mail (body: email) |
+| POST   | /auth/reset-password | Redefine a senha com token valido (body: token, newPassword) |
+| GET    | /auth/admins | Lista emails dos admins cadastrados (protegido) |
+| POST   | /auth/invite-admin | Envia convite por e-mail para novo admin (protegido; body: email) |
+| POST   | /auth/accept-invite | Aceita convite e cria admin (body: token, newPassword) |
+| DELETE | /auth/admins/:id | Exclui admin (requer CSRF; não permite excluir o ultimo admin ativo) |
 | POST   | /auth/refresh | Rotaciona refresh e renova access |
 | POST   | /auth/logout | Revoga refresh atual e limpa cookies |
 | GET    | /auth/me | Retorna usuario autenticado |

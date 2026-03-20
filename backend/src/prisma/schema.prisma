@@ -38,15 +38,17 @@ model Customer {
 }
 
 model Admin {
-  id               String            @id @default(cuid())
-  email            String?           @unique
-  phone            String?           @unique
-  passwordHash     String
-  createdAt        String
-  isActive         Boolean           @default(false)
-  updatedAt        String            @default("")
-  activationTokens ActivationToken[]
-  refreshSessions  RefreshSession[]
+  id                   String                @id @default(cuid())
+  email                String?               @unique
+  phone                String?               @unique
+  passwordHash         String
+  createdAt            String
+  isActive             Boolean               @default(false)
+  updatedAt            String                @default("")
+  activationTokens     ActivationToken[]
+  refreshSessions      RefreshSession[]
+  passwordResetTokens  PasswordResetToken[]
+  invitationsSent      InvitationToken[]
 }
 
 model ActivationToken {
@@ -79,4 +81,30 @@ model RefreshSession {
   @@index([adminId])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+model PasswordResetToken {
+  id         String  @id @default(cuid())
+  adminId    String
+  tokenHash  String  @unique
+  expiresAt  String
+  createdAt  String
+  admin      Admin   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
+model InvitationToken {
+  id               String  @id @default(cuid())
+  invitedEmail     String
+  tokenHash        String  @unique
+  invitedByAdminId String
+  expiresAt        String
+  createdAt        String
+  admin            Admin   @relation(fields: [invitedByAdminId], references: [id], onDelete: Cascade)
+
+  @@index([invitedByAdminId])
+  @@index([expiresAt])
+  @@index([invitedEmail])
 }
