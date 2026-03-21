@@ -8,6 +8,7 @@ import NewOrderPage from '../pages/NewOrderPage.tsx'
 import ClientsPage from '../pages/ClientsPage.tsx'
 import SettingsPage from '../pages/SettingsPage.tsx'
 import LoginPage from '../pages/LoginPage.tsx'
+import ConvitePage from '../pages/ConvitePage.tsx'
 import NotFoundPage from '../pages/NotFoundPage.tsx'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -30,6 +31,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/convite" element={<ConvitePage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AdminLayout />}>
           <Route path="/" element={<DashboardPage />} />

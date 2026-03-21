@@ -1,7 +1,13 @@
 /// <reference types="node" />
+import 'dotenv/config'
+import bcrypt from 'bcryptjs'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
+
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL ?? 'ioiobsant@gmail.com').trim().toLowerCase()
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH
+const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 12)
 
 type SeedOrder = {
   id: string
@@ -179,6 +185,29 @@ function splitName(name: string): { firstName: string; lastName: string } {
 }
 
 async function main() {
+  const now = new Date().toISOString()
+  const passwordHash =
+    ADMIN_PASSWORD_HASH && ADMIN_PASSWORD_HASH.length > 0
+      ? ADMIN_PASSWORD_HASH
+      : await bcrypt.hash('TempPassword1!', BCRYPT_SALT_ROUNDS)
+
+  const admin = await prisma.admin.upsert({
+    where: { email: ADMIN_EMAIL },
+    create: {
+      email: ADMIN_EMAIL,
+      passwordHash,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    update: {
+      passwordHash,
+      isActive: true,
+      updatedAt: now,
+    },
+  })
+  console.log('Admin único configurado:', admin.email)
+
   await prisma.order.deleteMany()
   await prisma.customer.deleteMany()
 

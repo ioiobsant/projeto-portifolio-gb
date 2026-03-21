@@ -19,7 +19,12 @@ const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-alterar-em-producao";
 const ACCESS_TOKEN_TTL_MINUTES = Number(process.env.ACCESS_TOKEN_TTL_MINUTES ?? 15);
 const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7);
 const ACTIVATION_TOKEN_TTL_MINUTES = Number(process.env.ACTIVATION_TOKEN_TTL_MINUTES ?? 30);
+const PASSWORD_RESET_TOKEN_TTL_MINUTES = Number(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES ?? 30);
+const INVITATION_TOKEN_TTL_MINUTES = Number(process.env.INVITATION_TOKEN_TTL_MINUTES ?? 60 * 24); // 24h
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 12);
+
+// Admin "protegido" (não pode ser excluído)
+const ADMIN_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL ?? "ioiobsant@gmail.com");
 
 const SMTP_HOST = process.env.SMTP_HOST ?? "";
 const SMTP_PORT = Number(process.env.SMTP_PORT ?? 587);
@@ -206,17 +211,17 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function buildActivationLink(token: string): string {
+function buildResetPasswordLink(token: string): string {
   const baseUrl = process.env.CORS_ORIGIN ?? "http://localhost:5173";
-  return `${baseUrl}/ativar?token=${encodeURIComponent(token)}`;
+  return `${baseUrl}/login?reset=${encodeURIComponent(token)}`;
 }
 
-async function sendActivationEmail(to: string, token: string): Promise<void> {
-  const activationLink = buildActivationLink(token);
+async function sendPasswordResetEmail(to: string, token: string): Promise<void> {
+  const resetLink = buildResetPasswordLink(token);
 
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    console.log(`[Auth] Token de ativação para ${to}: ${token}`);
-    console.log(`[Auth] Link de ativação: ${activationLink}`);
+    console.log(`[Auth] Token de redefinição para ${to}: ${token}`);
+    console.log(`[Auth] Link: ${resetLink}`);
     return;
   }
 
@@ -230,22 +235,69 @@ async function sendActivationEmail(to: string, token: string): Promise<void> {
   await transporter.sendMail({
     from: SMTP_FROM || SMTP_USER,
     to,
-    subject: "Ative sua conta — Genice Brandão Atelier",
-    text: `Olá!\n\nUse o código abaixo para ativar sua conta (válido por ${ACTIVATION_TOKEN_TTL_MINUTES} minutos):\n\n${token}\n\nOu acesse o link direto:\n${activationLink}\n\nSe você não solicitou esse cadastro, ignore este e-mail.`,
+    subject: "Redefinição de senha — Genice Brandão Atelier",
+    text: `Olá!\n\nUse o código abaixo para redefinir sua senha (válido por ${PASSWORD_RESET_TOKEN_TTL_MINUTES} minutos):\n\n${token}\n\nOu acesse o link:\n${resetLink}\n\nSe você não solicitou essa alteração, ignore este e-mail.`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#b06a3a">Genice Brandão Atelier</h2>
-        <p>Olá! Para ativar sua conta, use o código abaixo:</p>
+        <p>Olá! Para redefinir sua senha, use o código abaixo:</p>
         <div style="background:#f5f0eb;padding:16px 24px;border-radius:8px;text-align:center;font-size:24px;letter-spacing:4px;font-weight:bold;color:#3d1f0a">
           ${token}
         </div>
-        <p style="margin-top:16px">Ou clique no botão para ativar diretamente:</p>
-        <a href="${activationLink}" style="display:inline-block;margin-top:8px;padding:10px 24px;background:#b06a3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold">
-          Ativar minha conta
+        <p style="margin-top:16px">Ou clique no botão:</p>
+        <a href="${resetLink}" style="display:inline-block;margin-top:8px;padding:10px 24px;background:#b06a3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold">
+          Redefinir senha
         </a>
         <p style="margin-top:24px;font-size:12px;color:#888">
-          Este código expira em ${ACTIVATION_TOKEN_TTL_MINUTES} minutos.<br>
-          Se você não solicitou esse cadastro, ignore este e-mail.
+          Este código expira em ${PASSWORD_RESET_TOKEN_TTL_MINUTES} minutos.<br>
+          Se você não solicitou essa alteração, ignore este e-mail.
+        </p>
+      </div>
+    `,
+  });
+}
+
+function buildInviteLink(token: string): string {
+  const baseUrl = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+  return `${baseUrl}/convite?token=${encodeURIComponent(token)}`;
+}
+
+async function sendInvitationEmail(to: string, token: string): Promise<void> {
+  const inviteLink = buildInviteLink(token);
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    console.log(`[Auth] Token de convite para ${to}: ${token}`);
+    console.log(`[Auth] Link: ${inviteLink}`);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+
+  const ttlHours = Math.round(INVITATION_TOKEN_TTL_MINUTES / 60);
+  await transporter.sendMail({
+    from: SMTP_FROM || SMTP_USER,
+    to,
+    subject: "Convite para acesso — Genice Brandão Atelier",
+    text: `Olá!\n\nVocê foi convidado a acessar o painel. Use o código abaixo para cadastrar sua senha (válido por ${ttlHours}h):\n\n${token}\n\nOu acesse o link:\n${inviteLink}\n\nSe você não esperava este convite, ignore este e-mail.`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#b06a3a">Genice Brandão Atelier</h2>
+        <p>Você foi convidado a acessar o painel. Use o código abaixo para cadastrar sua senha:</p>
+        <div style="background:#f5f0eb;padding:16px 24px;border-radius:8px;text-align:center;font-size:24px;letter-spacing:4px;font-weight:bold;color:#3d1f0a">
+          ${token}
+        </div>
+        <p style="margin-top:16px">Ou clique no botão:</p>
+        <a href="${inviteLink}" style="display:inline-block;margin-top:8px;padding:10px 24px;background:#b06a3a;color:#fff;border-radius:6px;text-decoration:none;font-weight:bold">
+          Cadastrar minha senha
+        </a>
+        <p style="margin-top:24px;font-size:12px;color:#888">
+          Este convite expira em ${ttlHours} horas.<br>
+          Se você não esperava este convite, ignore este e-mail.
         </p>
       </div>
     `,
@@ -348,7 +400,7 @@ function validateCsrfPair(req: Request) {
   }
 }
 
-function requireAuth(req: Request, res: Response, next: NextFunction) {
+async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const accessFromCookie = getCookie(req, ACCESS_COOKIE_NAME);
   const accessFromHeader = extractBearerToken(req.headers.authorization);
   const token = accessFromCookie ?? accessFromHeader;
@@ -359,6 +411,15 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 
   try {
     const adminId = verifyAccessToken(token);
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { isActive: true },
+    });
+
+    if (!admin || !admin.isActive) {
+      return res.status(401).json({ error: "Sessao invalida." });
+    }
+
     (req as AuthenticatedRequest).auth = { adminId };
     return next();
   } catch {
@@ -705,124 +766,275 @@ app.delete("/orders/:id", async (req, res) => {
   }
 });
 
-app.post("/auth/register", async (req, res) => {
+app.post("/auth/forgot-password", async (req, res) => {
   try {
-    const { email, password } = req.body as {
-      email?: string;
-      password?: string;
-    };
+    const { email: rawEmail } = req.body as { email?: string };
+    const emailNorm = normalizeEmail(rawEmail ?? "");
 
-    const emailNorm = normalizeEmail(email ?? "");
+    if (!emailNorm) {
+      return res.status(400).json({ error: "Informe o email cadastrado." });
+    }
+
+    const admin = await prisma.admin.findFirst({
+      where: { email: emailNorm, isActive: true },
+      select: { id: true },
+    });
+
+    if (!admin) {
+      return res.json({ ok: true });
+    }
+
+    const now = nowIso();
+    await prisma.passwordResetToken.deleteMany({ where: { adminId: admin.id } });
+
+    const token = generateOpaqueToken(32);
+    const tokenHash = hashToken(token);
+
+    await prisma.passwordResetToken.create({
+      data: {
+        adminId: admin.id,
+        tokenHash,
+        createdAt: now,
+        expiresAt: addMinutes(new Date(), PASSWORD_RESET_TOKEN_TTL_MINUTES).toISOString(),
+      },
+    });
+
+    await sendPasswordResetEmail(emailNorm, token);
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error, "Erro ao solicitar redefinicao de senha.");
+  }
+});
+
+app.post("/auth/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body as { token?: string; newPassword?: string };
+    const rawToken = (token ?? "").trim();
+
+    if (!rawToken) {
+      throw new HttpError(400, "Token de redefinicao obrigatorio.");
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      throw new HttpError(400, "A nova senha deve ter no minimo 8 caracteres.");
+    }
+
+    const tokenHash = hashToken(rawToken);
+
+    const resetRecord = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { admin: true },
+    });
+
+    if (!resetRecord) {
+      throw new HttpError(400, "Token invalido ou expirado.");
+    }
+
+    if (new Date(resetRecord.expiresAt) < new Date()) {
+      await prisma.passwordResetToken.delete({ where: { id: resetRecord.id } });
+      throw new HttpError(400, "Token expirado.");
+    }
+
+    const now = nowIso();
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+
+    await prisma.$transaction([
+      prisma.admin.update({
+        where: { id: resetRecord.adminId },
+        data: { passwordHash, updatedAt: now },
+      }),
+      prisma.passwordResetToken.deleteMany({ where: { adminId: resetRecord.adminId } }),
+    ]);
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error, "Erro ao redefinir senha.");
+  }
+});
+
+app.get("/auth/admins", requireAuth, async (req, res) => {
+  try {
+    const admins = await prisma.admin.findMany({
+      where: { isActive: true },
+      select: { id: true, email: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return res.json({
+      admins: admins.map((a) => ({ id: a.id, email: a.email ?? "", createdAt: a.createdAt })),
+    });
+  } catch (error) {
+    return handleError(res, error, "Erro ao listar admins.");
+  }
+});
+
+app.delete("/auth/admins/:id", requireAuth, requireCsrfForWrites, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const currentId = (req as AuthenticatedRequest).auth?.adminId;
+    const protectedEmail = ADMIN_EMAIL;
+
+    if (!targetId) {
+      throw new HttpError(400, "ID do admin invalido.");
+    }
+
+    const target = await prisma.admin.findUnique({
+      where: { id: targetId },
+      select: { id: true, isActive: true, email: true },
+    });
+
+    if (!target) {
+      throw new HttpError(404, "Admin nao encontrado.");
+    }
+
+    if (target.email && normalizeEmail(target.email) === protectedEmail) {
+      throw new HttpError(409, "Esta conta nao pode ser excluida.");
+    }
+
+    if (target.isActive) {
+      const activeCount = await prisma.admin.count({ where: { isActive: true } });
+      if (activeCount <= 1) {
+        throw new HttpError(409, "Nao e possivel excluir o ultimo admin ativo.");
+      }
+    }
+
+    await prisma.admin.delete({ where: { id: targetId } });
+
+    if (targetId === currentId) {
+      clearAuthCookies(res);
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return handleError(res, error, "Erro ao excluir admin.");
+  }
+});
+
+app.post("/auth/invite-admin", requireAuth, async (req, res) => {
+  try {
+    const adminId = (req as AuthenticatedRequest).auth?.adminId;
+    if (!adminId) throw new HttpError(401, "Nao autenticado.");
+
+    // Apenas o admin master (ADMIN_EMAIL) pode convidar novos admins.
+    const inviter = await prisma.admin.findUnique({
+      where: { id: adminId },
+      select: { email: true, isActive: true },
+    });
+    if (!inviter || !inviter.isActive) {
+      throw new HttpError(401, "Nao autenticado.");
+    }
+    const inviterEmail = normalizeEmail(inviter.email ?? "");
+    if (inviterEmail !== ADMIN_EMAIL) {
+      throw new HttpError(403, "Apenas o admin master pode cadastrar novos admins.");
+    }
+
+    const { email: rawEmail } = req.body as { email?: string };
+    const emailNorm = normalizeEmail(rawEmail ?? "");
 
     if (!emailNorm) {
       throw new HttpError(400, "Informe um email valido.");
     }
 
-    if (!password || password.length < 8) {
-      throw new HttpError(400, "A senha deve ter no minimo 8 caracteres.");
-    }
-
     const existingAdmin = await prisma.admin.findFirst({
       where: { email: emailNorm },
     });
+    if (existingAdmin) {
+      throw new HttpError(409, "Ja existe um admin com esse email.");
+    }
 
-    if (existingAdmin?.isActive) {
-      throw new HttpError(409, "Ja existe uma conta ativa com esse email.");
+    const existingInvite = await prisma.invitationToken.findFirst({
+      where: { invitedEmail: emailNorm },
+    });
+    if (existingInvite && new Date(existingInvite.expiresAt) > new Date()) {
+      throw new HttpError(409, "Ja existe um convite pendente para esse email.");
+    }
+
+    if (existingInvite) {
+      await prisma.invitationToken.deleteMany({ where: { invitedEmail: emailNorm } });
     }
 
     const now = nowIso();
-    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+    const token = generateOpaqueToken(32);
+    const tokenHash = hashToken(token);
 
-    const admin = existingAdmin
-      ? await prisma.admin.update({
-          where: { id: existingAdmin.id },
-          data: {
-            email: emailNorm,
-            passwordHash,
-            isActive: false,
-            updatedAt: now,
-          },
-        })
-      : await prisma.admin.create({
-          data: {
-            email: emailNorm,
-            passwordHash,
-            isActive: false,
-            createdAt: now,
-            updatedAt: now,
-          },
-        });
-
-    await prisma.activationToken.deleteMany({ where: { adminId: admin.id } });
-
-    const activationToken = generateOpaqueToken(32);
-    const tokenHash = hashToken(activationToken);
-
-    await prisma.activationToken.create({
+    await prisma.invitationToken.create({
       data: {
-        adminId: admin.id,
+        invitedEmail: emailNorm,
         tokenHash,
+        invitedByAdminId: adminId,
         createdAt: now,
-        expiresAt: addMinutes(new Date(), ACTIVATION_TOKEN_TTL_MINUTES).toISOString(),
+        expiresAt: addMinutes(new Date(), INVITATION_TOKEN_TTL_MINUTES).toISOString(),
       },
     });
 
-    await sendActivationEmail(emailNorm, activationToken);
+    await sendInvitationEmail(emailNorm, token);
 
-    return res.status(201).json(
-      IS_PROD
-        ? { ok: true }
-        : { ok: true, activationToken }
-    );
+    return res.status(201).json({ ok: true });
   } catch (error) {
-    return handleError(res, error, "Erro ao registrar usuario.");
+    return handleError(res, error, "Erro ao enviar convite.");
   }
 });
 
-app.post("/auth/activate", async (req, res) => {
+app.post("/auth/accept-invite", async (req, res) => {
   try {
-    const { token } = req.body as { token?: string };
+    const { token, newPassword } = req.body as { token?: string; newPassword?: string };
     const rawToken = (token ?? "").trim();
 
     if (!rawToken) {
-      throw new HttpError(400, "Token de ativacao obrigatorio.");
+      throw new HttpError(400, "Token de convite obrigatorio.");
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      throw new HttpError(400, "A senha deve ter no minimo 8 caracteres.");
     }
 
     const tokenHash = hashToken(rawToken);
 
-    const activation = await prisma.activationToken.findUnique({
+    const invitation = await prisma.invitationToken.findUnique({
       where: { tokenHash },
     });
 
-    if (!activation) {
-      throw new HttpError(400, "Token de ativacao invalido.");
+    if (!invitation) {
+      throw new HttpError(400, "Token invalido ou expirado.");
     }
 
-    if (activation.consumedAt) {
-      throw new HttpError(400, "Token de ativacao ja utilizado.");
+    if (new Date(invitation.expiresAt) < new Date()) {
+      await prisma.invitationToken.delete({ where: { id: invitation.id } });
+      throw new HttpError(400, "Convite expirado.");
     }
 
-    if (new Date(activation.expiresAt) < new Date()) {
-      await prisma.activationToken.delete({ where: { id: activation.id } });
-      throw new HttpError(400, "Token de ativacao expirado.");
+    const emailNorm = invitation.invitedEmail;
+    const existingAdmin = await prisma.admin.findFirst({
+      where: { email: emailNorm },
+    });
+    if (existingAdmin) {
+      await prisma.invitationToken.deleteMany({ where: { invitedEmail: emailNorm } });
+      throw new HttpError(409, "Este email ja possui uma conta ativa.");
     }
 
     const now = nowIso();
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 
     await prisma.$transaction([
-      prisma.admin.update({
-        where: { id: activation.adminId },
+      prisma.admin.create({
         data: {
+          email: emailNorm,
+          passwordHash,
           isActive: true,
+          createdAt: now,
           updatedAt: now,
         },
       }),
-      prisma.activationToken.deleteMany({ where: { adminId: activation.adminId } }),
+      prisma.invitationToken.deleteMany({ where: { invitedEmail: emailNorm } }),
     ]);
 
-    return res.json({ ok: true });
+    // Se o usuário estiver logado (ex.: admin master no mesmo navegador),
+    // evita que continue autenticado como o admin anterior após aceitar o convite.
+    clearAuthCookies(res);
+
+    return res.json({ ok: true, email: emailNorm });
   } catch (error) {
-    return handleError(res, error, "Erro ao ativar conta.");
+    return handleError(res, error, "Erro ao aceitar convite.");
   }
 });
 
@@ -833,16 +1045,14 @@ app.post("/auth/login", async (req, res) => {
       password?: string;
     };
 
-    const rawLogin = (login ?? "").trim();
-    const isEmailLogin = rawLogin.includes("@");
-    const loginNorm = isEmailLogin ? normalizeEmail(rawLogin) : normalizePhone(rawLogin);
+    const loginNorm = normalizeEmail((login ?? "").trim());
 
     if (!loginNorm || !password) {
-      throw new HttpError(400, "Login e senha sao obrigatorios.");
+      throw new HttpError(400, "Email e senha sao obrigatorios.");
     }
 
     const admin = await prisma.admin.findFirst({
-      where: isEmailLogin ? { email: loginNorm } : { phone: loginNorm },
+      where: { email: loginNorm },
       select: {
         id: true,
         email: true,
@@ -858,7 +1068,7 @@ app.post("/auth/login", async (req, res) => {
     }
 
     if (!admin.isActive) {
-      throw new HttpError(403, "Conta ainda nao ativada.");
+      throw new HttpError(403, "Conta inativa.");
     }
 
     const accessToken = createAccessToken(admin.id);
