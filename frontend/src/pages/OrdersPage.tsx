@@ -58,7 +58,7 @@ import { formatBrazilianPhone } from '../utils/phone'
 import { formatBrazilianCurrency, parseBrazilianCurrency } from '../utils/currency'
 import * as ordersApi from '../api/orders'
 import { pdf } from '@react-pdf/renderer'
-import { OrdersPdfDocument } from '../components/OrdersPdfDocument'
+import { OrdersPdfDocument, type OrdersPdfDocumentRow } from '../components/OrdersPdfDocument'
 
 type OrderWithDisplay = ReturnType<typeof getOrdersWithDisplayDates>[number]
 
@@ -613,9 +613,13 @@ function OrdersPage() {
       // Abre a aba imediatamente para evitar bloqueio de pop-up.
       // Usamos 'about:blank' para melhorar a compatibilidade e garantir uma referência válida ao `w`.
       const w = window.open('about:blank', '_blank')
+      const pdfRows: OrdersPdfDocumentRow[] = rows.map((row) => ({
+        ...row,
+        deliveryDateDisplay: row.deliveryDateDisplay,
+      }))
       const blob = await pdf(
         <OrdersPdfDocument
-          rows={rows as unknown as any}
+          rows={pdfRows}
           categoryLabel={categoryLabel}
           statusLabel={statusLabel}
           materialLabel={materialLabel}
@@ -636,7 +640,6 @@ function OrdersPage() {
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (e) {
-      // eslint-disable-next-line no-alert
       alert(e instanceof Error ? `Erro ao exportar pedidos: ${e.message}` : 'Erro ao exportar pedidos.')
     }
   }
