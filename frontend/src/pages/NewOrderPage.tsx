@@ -46,6 +46,16 @@ export default function NewOrderPage() {
   const [customerLookupInfo, setCustomerLookupInfo] = useState('')
   const [customerLookupError, setCustomerLookupError] = useState('')
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
+  const [matchedCustomer, setMatchedCustomer] = useState<{
+    email: string
+    phoneDigits: string
+    phoneFormatted: string
+    firstName: string
+    lastName: string
+  } | null>(null)
+
+  const normalizeEmail = (email: string): string => email.trim().toLowerCase()
+  const normalizePhoneDigits = (value: string): string => value.replace(/\D/g, '')
 
   useEffect(() => {
     const settings = loadSettings()
@@ -95,6 +105,7 @@ export default function NewOrderPage() {
     if (!email && phoneDigits.length < 10) {
       setCustomerLookupInfo('')
       setCustomerLookupError('')
+      setMatchedCustomer(null)
       return
     }
 
@@ -109,8 +120,25 @@ export default function NewOrderPage() {
 
       if (!result.found || !result.customer) {
         setCustomerLookupInfo('')
+        setMatchedCustomer(null)
         return
       }
+
+      const lookedUpEmail = result.customer.email?.trim() ?? ''
+      const lookedUpPhoneDigits = normalizePhoneDigits(
+        result.customer.whatsapp ? formatBrazilianPhone(result.customer.whatsapp) : ''
+      )
+      const lookedUpPhoneFormatted = result.customer.whatsapp
+        ? formatBrazilianPhone(result.customer.whatsapp)
+        : ''
+
+      setMatchedCustomer({
+        email: lookedUpEmail,
+        phoneDigits: lookedUpPhoneDigits,
+        phoneFormatted: lookedUpPhoneFormatted,
+        firstName: result.customer.firstName ?? '',
+        lastName: result.customer.lastName ?? '',
+      })
 
       setForm((prev) => {
         if (!prev) return prev
@@ -131,13 +159,155 @@ export default function NewOrderPage() {
     } catch (e) {
       setCustomerLookupInfo('')
       setCustomerLookupError(e instanceof Error ? e.message : 'Erro ao buscar cliente.')
+      setMatchedCustomer(null)
     } finally {
       setCustomerLookupLoading(false)
     }
   }
 
+  const confirmAndPossiblyRevertCustomerIdentifierChanges = (): {
+    customerEmailToUse: string
+    customerPhoneToUse: string
+    customerFirstNameToUse: string
+    customerLastNameToUse: string
+  } => {
+    if (!form) {
+      return {
+        customerEmailToUse: '',
+        customerPhoneToUse: '',
+        customerFirstNameToUse: '',
+        customerLastNameToUse: '',
+      }
+    }
+    if (!matchedCustomer) {
+      return {
+        customerEmailToUse: form.customerEmail,
+        customerPhoneToUse: form.customerContact,
+        customerFirstNameToUse: form.customerFirstName,
+        customerLastNameToUse: form.customerLastName,
+      }
+    }
+
+    const formEmail = (form.customerEmail ?? '').trim()
+    const formPhone = (form.customerContact ?? '').trim()
+    const formFirstName = (form.customerFirstName ?? '').trim()
+    const formLastName = (form.customerLastName ?? '').trim()
+
+    const oldEmail = (matchedCustomer.email ?? '').trim()
+    const oldPhoneDigits = (matchedCustomer.phoneDigits ?? '').trim()
+    const formPhoneDigits = normalizePhoneDigits(formPhone)
+
+    const emailChanged =
+      oldEmail.length > 0 &&
+      formEmail.length > 0 &&
+      normalizeEmail(formEmail) !== normalizeEmail(oldEmail)
+    const phoneChanged =
+      oldPhoneDigits.length > 0 && formPhoneDigits.length > 0 && formPhoneDigits !== oldPhoneDigits
+    const firstNameChanged =
+      (matchedCustomer.firstName ?? '').trim().length > 0 &&
+      formFirstName.length > 0 &&
+      matchedCustomer.firstName.trim() !== formFirstName
+    const lastNameChanged =
+      (matchedCustomer.lastName ?? '').trim().length > 0 &&
+      formLastName.length > 0 &&
+      matchedCustomer.lastName.trim() !== formLastName
+
+    if (!emailChanged && !phoneChanged && !firstNameChanged && !lastNameChanged) {
+      return {
+        customerEmailToUse: formEmail,
+        customerPhoneToUse: formPhone,
+        customerFirstNameToUse: formFirstName,
+        customerLastNameToUse: formLastName,
+      }
+    }
+
+    let msg = 'O cliente identificado no cadastro possui valores diferentes dos campos que você alterou.\n\n'
+    if (emailChanged) {
+      msg += `E-mail alterado: "${formEmail}" (cadastro: "${oldEmail}")\n`
+    }
+    if (phoneChanged) {
+      msg += `Número alterado: "${formPhone}" (cadastro: "${matchedCustomer.phoneFormatted}")\n`
+    }
+    if (firstNameChanged) {
+      msg += `Nome alterado: "${formFirstName}" (cadastro: "${matchedCustomer.firstName}")\n`
+    }
+    if (lastNameChanged) {
+      msg += `Sobrenome alterado: "${formLastName}" (cadastro: "${matchedCustomer.lastName}")\n`
+    }
+    msg += '\nDeseja atualizar as informações do cliente no cadastro?'
+
+    const shouldUpdate = window.confirm(msg)
+
+    if (!shouldUpdate) {
+      setForm((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          customerEmail: emailChanged ? oldEmail : prev.customerEmail,
+          customerContact: phoneChanged ? matchedCustomer.phoneFormatted : prev.customerContact,
+          customerFirstName: firstNameChanged ? matchedCustomer.firstName : prev.customerFirstName,
+          customerLastName: lastNameChanged ? matchedCustomer.lastName : prev.customerLastName,
+        }
+      })
+      return {
+        customerEmailToUse: emailChanged ? oldEmail : formEmail,
+        customerPhoneToUse: phoneChanged ? matchedCustomer.phoneFormatted : formPhone,
+        customerFirstNameToUse: firstNameChanged ? matchedCustomer.firstName : formFirstName,
+        customerLastNameToUse: lastNameChanged ? matchedCustomer.lastName : formLastName,
+      }
+    }
+
+    // Se o usuário aceitar atualizar, ajusta o baseline para não perguntar novamente.
+    setMatchedCustomer((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        email: emailChanged ? formEmail : prev.email,
+        phoneDigits: phoneChanged ? formPhoneDigits : prev.phoneDigits,
+        phoneFormatted: phoneChanged ? formPhone : prev.phoneFormatted,
+        firstName: firstNameChanged ? formFirstName : prev.firstName,
+        lastName: lastNameChanged ? formLastName : prev.lastName,
+      }
+    })
+
+    return {
+      customerEmailToUse: emailChanged ? formEmail : formEmail,
+      customerPhoneToUse: phoneChanged ? formPhone : formPhone,
+      customerFirstNameToUse: firstNameChanged ? formFirstName : formFirstName,
+      customerLastNameToUse: lastNameChanged ? formLastName : formLastName,
+    }
+  }
+
+  const handleCustomerEmailBlur = () => {
+    // Se ainda não houve lookup, mantém o comportamento padrão (tentar identificar).
+    if (!matchedCustomer) {
+      void handleCustomerLookup()
+      return
+    }
+    void confirmAndPossiblyRevertCustomerIdentifierChanges()
+  }
+
+  const handleCustomerContactBlur = () => {
+    if (!matchedCustomer) {
+      void handleCustomerLookup()
+      return
+    }
+    void confirmAndPossiblyRevertCustomerIdentifierChanges()
+  }
+
+  const handleCustomerFirstNameBlur = () => {
+    if (!matchedCustomer) return
+    void confirmAndPossiblyRevertCustomerIdentifierChanges()
+  }
+
+  const handleCustomerLastNameBlur = () => {
+    if (!matchedCustomer) return
+    void confirmAndPossiblyRevertCustomerIdentifierChanges()
+  }
+
   const handleSubmit = async () => {
     if (!form) return
+    const identifiersToUse = confirmAndPossiblyRevertCustomerIdentifierChanges()
     const name = fullName(form.customerFirstName, form.customerLastName)
     const orderId = form.id.trim().toUpperCase()
     if (!orderId) {
@@ -171,11 +341,11 @@ export default function NewOrderPage() {
       productImageUrl: form.productImageUrl.trim() || undefined,
       size: form.size.trim() || undefined,
       customer: {
-        name,
-        whatsapp: form.customerContact.trim(),
-        email: (form.customerEmail || '').trim() || '',
-        firstName: form.customerFirstName.trim(),
-        lastName: form.customerLastName.trim(),
+        name: fullName(identifiersToUse.customerFirstNameToUse, identifiersToUse.customerLastNameToUse),
+        whatsapp: identifiersToUse.customerPhoneToUse.trim(),
+        email: identifiersToUse.customerEmailToUse.trim() || '',
+        firstName: identifiersToUse.customerFirstNameToUse.trim(),
+        lastName: identifiersToUse.customerLastNameToUse.trim(),
       },
       specs: {
         hasPainting: form.hasPainting,
@@ -249,6 +419,7 @@ export default function NewOrderPage() {
             size="small"
             value={form.customerFirstName}
             onChange={(e) => handleFieldChange('customerFirstName', e.target.value)}
+            onBlur={handleCustomerFirstNameBlur}
             placeholder="Ex.: Maria"
             fullWidth
           />
@@ -257,6 +428,7 @@ export default function NewOrderPage() {
             size="small"
             value={form.customerLastName}
             onChange={(e) => handleFieldChange('customerLastName', e.target.value)}
+            onBlur={handleCustomerLastNameBlur}
             placeholder="Ex.: Silva"
             fullWidth
           />
@@ -270,7 +442,7 @@ export default function NewOrderPage() {
               setCustomerLookupError('')
               handleFieldChange('customerEmail', e.target.value)
             }}
-            onBlur={handleCustomerLookup}
+            onBlur={handleCustomerEmailBlur}
             fullWidth
           />
           <TextField
@@ -282,7 +454,7 @@ export default function NewOrderPage() {
               setCustomerLookupError('')
               handleFieldChange('customerContact', formatBrazilianPhone(e.target.value))
             }}
-            onBlur={handleCustomerLookup}
+            onBlur={handleCustomerContactBlur}
             placeholder="Ex.: (11) 99999-0000"
             inputProps={{ inputMode: 'numeric', maxLength: 16 }}
             fullWidth
@@ -326,7 +498,7 @@ export default function NewOrderPage() {
                 size="small"
                 value={form.id}
                 onChange={(e) => handleFieldChange('id', e.target.value)}
-                helperText="Gerado automaticamente (ex.: GBA-123456). Você pode alterar se desejar."
+                helperText={`Gerado automaticamente (ex.: ${loadSettings().orderIdPrefix}-123456). Você pode alterar se desejar.`}
                 sx={{ flex: 1 }}
               />
               <Button

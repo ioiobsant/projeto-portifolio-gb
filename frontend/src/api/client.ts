@@ -5,8 +5,9 @@ const AUTH_REFRESH_PATH = '/auth/refresh'
 
 const NON_REFRESHABLE_PATHS = new Set([
   '/auth/login',
-  '/auth/register',
-  '/auth/activate',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/accept-invite',
   '/auth/refresh',
 ])
 

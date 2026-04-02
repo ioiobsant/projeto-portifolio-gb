@@ -57,6 +57,8 @@ import { createInitialOrderForm, createOrderFormFromOrder, type NewOrderForm } f
 import { formatBrazilianPhone } from '../utils/phone'
 import { formatBrazilianCurrency, parseBrazilianCurrency } from '../utils/currency'
 import * as ordersApi from '../api/orders'
+import { pdf } from '@react-pdf/renderer'
+import { OrdersPdfDocument } from '../components/OrdersPdfDocument'
 
 type OrderWithDisplay = ReturnType<typeof getOrdersWithDisplayDates>[number]
 
@@ -110,6 +112,27 @@ function compareByStatus(a: OrderWithDisplay, b: OrderWithDisplay, order: 'asc' 
   const indexA = ORDER_STATUSES.indexOf(a.status)
   const indexB = ORDER_STATUSES.indexOf(b.status)
   return order === 'asc' ? indexA - indexB : indexB - indexA
+}
+
+function parseISODateToLocalMidnight(isoDate: string): Date | null {
+  // Esperado: 'YYYY-MM-DD' (valor do <TextField type="date" />)
+  const parts = isoDate.split('-')
+  if (parts.length !== 3) return null
+  const [yRaw, mRaw, dRaw] = parts
+  const y = Number(yRaw)
+  const m = Number(mRaw)
+  const d = Number(dRaw)
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null
+  // m em JS é 0-indexado
+  return new Date(y, m - 1, d, 0, 0, 0, 0)
+}
+
+function isDeliveryDateOverdue(isoDate: string): boolean {
+  const date = parseISODateToLocalMidnight(isoDate)
+  if (!date) return false
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+  return date.getTime() < today.getTime()
 }
 
 interface OrdersTableProps {
@@ -297,7 +320,14 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
                       <Typography variant="caption" sx={{ display: 'block', fontFamily: 'monospace', color: 'text.secondary', fontSize: '0.75rem' }}>
                         {row.id}
                       </Typography>
-                      <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontSize: '0.75rem' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: 'block',
+                          color: isDeliveryDateOverdue(row.deliveryDate) ? 'error.main' : 'text.secondary',
+                          fontSize: '0.75rem',
+                        }}
+                      >
                         Entrega: {row.deliveryDateDisplay}
                       </Typography>
                     </Box>
@@ -404,7 +434,14 @@ function OrdersTable({ rows, onViewDetails, onEditOrder, onRemoveOrder }: Orders
                     </Box>
                   </Box>
                 </TableCell>
-                <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>{row.deliveryDateDisplay}</TableCell>
+                <TableCell sx={{ py: 1.25, fontSize: '0.875rem' }}>
+                  <Typography
+                    component="span"
+                    sx={{ color: isDeliveryDateOverdue(row.deliveryDate) ? 'error.main' : 'inherit' }}
+                  >
+                    {row.deliveryDateDisplay}
+                  </Typography>
+                </TableCell>
                 <TableCell sx={{ py: 1.25 }}>
                   <Chip label={row.status} color={statusColors[row.status]} size="small" sx={{ fontWeight: 500, borderRadius: 2, fontSize: '0.8125rem' }} />
                 </TableCell>
@@ -448,6 +485,7 @@ function OrdersPage() {
   const [sortBy, setSortBy] = useState<SortBy>('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [searchId, setSearchId] = useState<string>('')
+  const [searchCustomer, setSearchCustomer] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<FilterStatusValue>('')
   const [filterMaterial, setFilterMaterial] = useState<string>('')
   const [filterFoam, setFilterFoam] = useState<string>('')
@@ -458,6 +496,7 @@ function OrdersPage() {
   const [editImageFileName, setEditImageFileName] = useState<string>('')
   const [orderPendingDelete, setOrderPendingDelete] = useState<OrderWithDisplay | null>(null)
   const [orderDetailView, setOrderDetailView] = useState<OrderWithDisplay | null>(null)
+  const [filtersExpanded, setFiltersExpanded] = useState<boolean>(true)
 
   const fetchOrders = useCallback(async () => {
     setOrdersLoading(true)
@@ -501,19 +540,17 @@ function OrdersPage() {
     [filteredByCategory]
   )
 
-  const uniqueFoams = useMemo(
-    () =>
-      Array.from(
-        new Set(filteredByCategory.map((o) => o.specs.foam).filter(Boolean))
-      ) as string[],
-    [filteredByCategory]
-  )
-
   const filteredList = useMemo(() => {
     let list = [...filteredByCategory]
     const idQuery = searchId.trim().toUpperCase()
     if (idQuery) {
       list = list.filter((o) => o.id.toUpperCase().includes(idQuery))
+    }
+    const customerQuery = searchCustomer.trim().toLowerCase()
+    if (customerQuery) {
+      list = list.filter((o) =>
+        (o.customer?.name ?? '').toLowerCase().includes(customerQuery)
+      )
     }
     if (ORDER_STATUSES.includes(filterStatus as OrderStatus)) {
       list = list.filter((o) => o.status === filterStatus)
@@ -530,7 +567,79 @@ function OrdersPage() {
       list.sort((a, b) => compareOrders(a, b, sortBy, sortOrder))
     }
     return list
-  }, [filteredByCategory, searchId, filterStatus, filterMaterial, filterFoam, sortBy, sortOrder])
+  }, [filteredByCategory, searchId, searchCustomer, filterStatus, filterMaterial, filterFoam, sortBy, sortOrder])
+
+  const getStatusExportLabel = (): string => {
+    if (!filterStatus) return 'Todos'
+    if (filterStatus === 'flow-asc') return 'Orçamento → Entregue'
+    if (filterStatus === 'flow-desc') return 'Entregue → Orçamento'
+    return filterStatus
+  }
+
+  const getSortExportLabel = (): string => {
+    if (filterStatus === 'flow-asc') return 'Por status: Orçamento → Entregue'
+    if (filterStatus === 'flow-desc') return 'Por status: Entregue → Orçamento'
+
+    const byLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label ?? sortBy
+    const orderLabel =
+      sortBy === 'createdAt' || sortBy === 'deliveryDate'
+        ? sortOrder === 'desc'
+          ? 'Mais recente primeiro'
+          : 'Mais antigo primeiro'
+        : sortOrder === 'desc'
+          ? 'Decrescente (Z→A)'
+          : 'Crescente (A→Z)'
+
+    return `${byLabel} (${orderLabel})`
+  }
+
+  const handleExportOrders = async () => {
+    if (ordersLoading) return
+    const rows = filteredList
+    if (rows.length === 0) return
+
+    const categoryLabel = categories[tab] ?? 'Todos'
+    const statusLabel = getStatusExportLabel()
+    const materialLabel = filterMaterial ? filterMaterial : 'Todos'
+    const foamLabel = filterFoam ? filterFoam : 'Todos'
+    const searchParts: string[] = []
+    if (searchId.trim()) searchParts.push(`Busca por ID: ${searchId.trim()}`)
+    if (searchCustomer.trim()) searchParts.push(`Busca por cliente: ${searchCustomer.trim()}`)
+    const searchLabel = searchParts.length ? searchParts.join(' | ') : 'Sem busca'
+    const sortLabel = getSortExportLabel()
+    const generatedAt = new Date().toLocaleString('pt-BR')
+
+    try {
+      // Abre a aba imediatamente para evitar bloqueio de pop-up.
+      // Usamos 'about:blank' para melhorar a compatibilidade e garantir uma referência válida ao `w`.
+      const w = window.open('about:blank', '_blank')
+      const blob = await pdf(
+        <OrdersPdfDocument
+          rows={rows as unknown as any}
+          categoryLabel={categoryLabel}
+          statusLabel={statusLabel}
+          materialLabel={materialLabel}
+          foamLabel={foamLabel}
+          searchLabel={searchLabel}
+          sortLabel={sortLabel}
+          generatedAt={generatedAt}
+        />
+      ).toBlob()
+
+      const url = URL.createObjectURL(blob)
+      if (w && !w.closed) {
+        // `replace` evita deixar histórico da página em branco.
+        w.location.replace(url)
+        w.focus?.()
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) {
+      // eslint-disable-next-line no-alert
+      alert(e instanceof Error ? `Erro ao exportar pedidos: ${e.message}` : 'Erro ao exportar pedidos.')
+    }
+  }
 
   const handleSortByChange = (value: SortBy) => {
     setSortBy(value)
@@ -775,131 +884,177 @@ function OrdersPage() {
       <Paper
         variant="outlined"
         sx={{
-          p: 2,
           mb: 2,
           borderRadius: 3,
           bgcolor: 'action.hover',
+          overflow: 'hidden',
         }}
       >
-        <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ mb: 1.5 }}>
-          Ordenar e filtrar
-        </Typography>
         <Box
+          onClick={() => setFiltersExpanded((prev) => !prev)}
           sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              sm: '1fr 1fr',
-              md: 'minmax(180px, 1.2fr) minmax(140px, 1fr) minmax(120px, auto) minmax(140px, 1fr) minmax(140px, 1fr) minmax(140px, 1fr)',
-            },
-            gap: 2,
-            alignItems: 'end',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: 2,
+            py: 1.5,
+            cursor: 'pointer',
+            borderBottom: filtersExpanded ? 1 : 0,
+            borderColor: 'divider',
+            '&:hover': { bgcolor: 'action.hover' },
           }}
+          role="button"
+          aria-expanded={filtersExpanded}
+          aria-controls="filters-content"
         >
-          <TextField
-            size="small"
-            placeholder="Pesquisa pelo ID"
-            value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="action" fontSize="small" />
-                </InputAdornment>
-              ),
+          <Typography variant="subtitle2" fontWeight={600} color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
+            Ordenar e filtrar
+          </Typography>
+          <IconButton size="small" aria-label={filtersExpanded ? 'Recolher filtros' : 'Expandir filtros'} sx={{ ml: 0.5 }}>
+            {filtersExpanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+          </IconButton>
+        </Box>
+        <Collapse in={filtersExpanded}>
+          <Box
+            id="filters-content"
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: '1fr 1fr',
+                md: '1fr 1fr 1fr 1fr',
+              },
+              gap: 2,
+              alignItems: 'end',
+              p: 2,
             }}
-            fullWidth
-          />
-          <FormControl size="small" fullWidth>
-            <InputLabel id="sort-by-label">Ordenar por</InputLabel>
-            <Select
-              labelId="sort-by-label"
-              label="Ordenar por"
-              value={sortBy}
-              onChange={(e) => handleSortByChange(e.target.value as SortBy)}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
+          >
+            <TextField
+              size="small"
+              placeholder="Pesquisa por ID"
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              fullWidth
+            />
+            <TextField
+              size="small"
+              placeholder="Pesquisa por cliente"
+              value={searchCustomer}
+              onChange={(e) => setSearchCustomer(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              fullWidth
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel id="sort-by-label">Ordenar por</InputLabel>
+              <Select
+                labelId="sort-by-label"
+                label="Ordenar por"
+                value={sortBy}
+                onChange={(e) => handleSortByChange(e.target.value as SortBy)}
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="sort-order-label" shrink>Ordem</InputLabel>
+              <Select
+                labelId="sort-order-label"
+                label="Ordem"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              >
+                <MenuItem value="asc">
+                  {sortBy === 'createdAt' || sortBy === 'deliveryDate'
+                    ? 'Mais antigo primeiro'
+                    : 'Crescente (A→Z)'}
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel id="sort-order-label" shrink>Ordem</InputLabel>
-            <Select
-              labelId="sort-order-label"
-              label="Ordem"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-            >
-              <MenuItem value="asc">
-                {sortBy === 'createdAt' || sortBy === 'deliveryDate'
-                  ? 'Mais antigo primeiro'
-                  : 'Crescente (A→Z)'}
-              </MenuItem>
-              <MenuItem value="desc">
-                {sortBy === 'createdAt' || sortBy === 'deliveryDate'
-                  ? 'Mais recente primeiro'
-                  : 'Decrescente (Z→A)'}
-              </MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel id="filter-status-label" shrink>Status</InputLabel>
-            <Select
-              labelId="filter-status-label"
-              label="Status"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus((e.target.value ?? '') as FilterStatusValue)}
-              displayEmpty
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="flow-asc">Orçamento → Entregue</MenuItem>
-              <MenuItem value="flow-desc">Entregue → Orçamento</MenuItem>
-              {ORDER_STATUSES.map((s) => (
-                <MenuItem key={s} value={s}>
-                  {s}
+                <MenuItem value="desc">
+                  {sortBy === 'createdAt' || sortBy === 'deliveryDate'
+                    ? 'Mais recente primeiro'
+                    : 'Decrescente (Z→A)'}
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel id="filter-material-label" shrink>Material</InputLabel>
-            <Select
-              labelId="filter-material-label"
-              label="Material"
-              value={filterMaterial}
-              onChange={(e) => setFilterMaterial(String(e.target.value ?? ''))}
-              displayEmpty
-            >
-              <MenuItem value="">Todos</MenuItem>
-              {uniqueMaterials.map((m) => (
-                <MenuItem key={m} value={m}>
-                  {m}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" fullWidth>
-            <InputLabel id="filter-foam-label" shrink>Tipo de esponja</InputLabel>
-            <Select
-              labelId="filter-foam-label"
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="filter-status-label" shrink>Status</InputLabel>
+              <Select
+                labelId="filter-status-label"
+                label="Status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus((e.target.value ?? '') as FilterStatusValue)}
+                displayEmpty
+              >
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="flow-asc">Orçamento → Entregue</MenuItem>
+                <MenuItem value="flow-desc">Entregue → Orçamento</MenuItem>
+                {ORDER_STATUSES.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel id="filter-material-label" shrink>Material</InputLabel>
+              <Select
+                labelId="filter-material-label"
+                label="Material"
+                value={filterMaterial}
+                onChange={(e) => setFilterMaterial(String(e.target.value ?? ''))}
+                displayEmpty
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {uniqueMaterials.map((m) => (
+                  <MenuItem key={m} value={m}>
+                    {m}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
               label="Tipo de esponja"
+              placeholder="Ex.: D18"
               value={filterFoam}
               onChange={(e) => setFilterFoam(String(e.target.value ?? ''))}
-              displayEmpty
-            >
-              <MenuItem value="">Todos</MenuItem>
-              {uniqueFoams.map((f) => (
-                <MenuItem key={f} value={f}>
-                  {f}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
+              InputLabelProps={{ shrink: true }}
+              sx={{
+                '& .MuiInputLabel-root': { color: 'text.secondary' },
+                '& .MuiInputLabel-root.Mui-focused': { color: 'text.secondary' },
+              }}
+              fullWidth
+            />
+          </Box>
+        </Collapse>
       </Paper>
+
+      <Box sx={{ display: 'flex', justifyContent: { xs: 'stretch', sm: 'flex-end' }, mb: 2, mt: 1 }}>
+        <Button
+          variant="outlined"
+          onClick={handleExportOrders}
+          disabled={filteredList.length === 0}
+          sx={{ minWidth: { xs: '100%', sm: 260 } }}
+        >
+          Exportar pedidos
+        </Button>
+      </Box>
 
       <Fab
         component={RouterLink}
@@ -1047,6 +1202,11 @@ function OrdersPage() {
         <DialogContent dividers>
           {orderDetailView && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {isDeliveryDateOverdue(orderDetailView.deliveryDate) && (
+                <Alert severity="error">
+                  Este pedido está em atraso. Atualize a <strong>data de entrega</strong> para corrigir.
+                </Alert>
+              )}
               <Box>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                   Cliente
@@ -1072,7 +1232,12 @@ function OrdersPage() {
                     <Typography variant="body2"><strong>Categoria:</strong> {orderDetailView.category}</Typography>
                     <Typography variant="body2"><strong>Modelo:</strong> {orderDetailView.model}</Typography>
                     {orderDetailView.size && <Typography variant="body2"><strong>Medidas:</strong> {orderDetailView.size}</Typography>}
-                    <Typography variant="body2"><strong>Data de entrega:</strong> {orderDetailView.deliveryDateDisplay}</Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: isDeliveryDateOverdue(orderDetailView.deliveryDate) ? 'error.main' : 'inherit' }}
+                    >
+                      <strong>Data de entrega:</strong> {orderDetailView.deliveryDateDisplay}
+                    </Typography>
                     <Typography variant="body2"><strong>Status:</strong> <Chip label={orderDetailView.status} color={statusColors[orderDetailView.status]} size="small" sx={{ height: 20, fontSize: '0.75rem' }} /></Typography>
                     <Typography variant="body2"><strong>Quantidade:</strong> {orderDetailView.quantity}</Typography>
                     <Typography variant="body2"><strong>Valor de venda:</strong> R$ {orderDetailView.saleValue.toLocaleString('pt-BR')}</Typography>

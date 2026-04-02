@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Paper from '@mui/material/Paper'
@@ -10,22 +10,21 @@ import Link from '@mui/material/Link'
 import { useAuth } from '../contexts/AuthContext'
 import * as authApi from '../api/auth'
 
-type Mode = 'login' | 'register' | 'activate'
+type Mode = 'login' | 'forgot' | 'reset'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated, login } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
 
-  const [loginValue, setLoginValue] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  const [registerEmail, setRegisterEmail] = useState('')
-  const [registerPassword, setRegisterPassword] = useState('')
-  const [registerConfirm, setRegisterConfirm] = useState('')
-
-  const [activationToken, setActivationToken] = useState('')
-  const [devActivationToken, setDevActivationToken] = useState<string | null>(null)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [resetToken, setResetToken] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -34,6 +33,22 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated) navigate('/', { replace: true })
   }, [isAuthenticated, navigate])
+
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('reset')
+    if (tokenFromUrl) {
+      setResetToken(tokenFromUrl)
+      setMode('reset')
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const emailFromUrl = searchParams.get('email')
+    if (emailFromUrl) {
+      setEmail(emailFromUrl)
+    }
+  }, [searchParams])
 
   const resetAlerts = () => {
     setError('')
@@ -45,76 +60,67 @@ export default function LoginPage() {
     resetAlerts()
     setLoading(true)
     try {
-      const ok = await login(loginValue.trim(), password)
+      const ok = await login(email.trim(), password)
       if (ok) {
         navigate('/', { replace: true })
       } else {
-        setError('Login ou senha incorretos.')
+        setError('Email ou senha incorretos.')
       }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleRegisterSubmit = async (e: FormEvent) => {
+  const handleForgotSubmit = async (e: FormEvent) => {
     e.preventDefault()
     resetAlerts()
-
-    const email = registerEmail.trim()
-
-    if (!email) {
-      setError('Informe um email valido.')
+    const emailToSend = forgotEmail.trim()
+    if (!emailToSend) {
+      setError('Digite o email cadastrado.')
       return
     }
-
-    if (registerPassword.length < 8) {
-      setError('A senha deve ter no minimo 8 caracteres.')
-      return
-    }
-
-    if (registerPassword !== registerConfirm) {
-      setError('As senhas nao coincidem.')
-      return
-    }
-
     setLoading(true)
     try {
-      const response = await authApi.register({
-        email,
-        password: registerPassword,
-      })
-
-      setDevActivationToken(response.activationToken ?? null)
-      setActivationToken(response.activationToken ?? '')
-      setSuccess('Cadastro criado. Ative sua conta para fazer login.')
-      setMode('activate')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao registrar conta.')
+      await authApi.forgotPassword(emailToSend)
+      setSuccess('Se o email estiver cadastrado, você receberá o token por e-mail. Insira o token abaixo e defina sua nova senha.')
+      setMode('reset')
+    } catch {
+      setSuccess('Se o email estiver cadastrado, você receberá o token por e-mail. Insira o token abaixo e defina sua nova senha.')
+      setMode('reset')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleActivateSubmit = async (e: FormEvent) => {
+  const handleResetSubmit = async (e: FormEvent) => {
     e.preventDefault()
     resetAlerts()
 
-    if (!activationToken.trim()) {
-      setError('Informe o token de ativacao.')
+    if (!resetToken.trim()) {
+      setError('Informe o token recebido por e-mail.')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setError('A nova senha deve ter no mínimo 8 caracteres.')
+      return
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      setError('As senhas não coincidem.')
       return
     }
 
     setLoading(true)
     try {
-      await authApi.activate(activationToken.trim())
-      setSuccess('Conta ativada com sucesso. Agora faca login.')
+      await authApi.resetPassword(resetToken.trim(), newPassword)
+      setSuccess('Senha alterada com sucesso. A partir de agora você pode entrar com seu email e nova senha.')
       setMode('login')
-      setLoginValue(registerEmail.trim())
-      setPassword('')
-      setActivationToken('')
-      setDevActivationToken(null)
+      setResetToken('')
+      setNewPassword('')
+      setNewPasswordConfirm('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao ativar conta.')
+      setError(err instanceof Error ? err.message : 'Erro ao redefinir senha.')
     } finally {
       setLoading(false)
     }
@@ -123,14 +129,11 @@ export default function LoginPage() {
   const goToLogin = () => {
     resetAlerts()
     setMode('login')
-    setDevActivationToken(null)
   }
 
-  const goToRegister = () => {
+  const goToForgot = () => {
     resetAlerts()
-    setMode('register')
-    setActivationToken('')
-    setDevActivationToken(null)
+    setMode('forgot')
   }
 
   return (
@@ -162,14 +165,14 @@ export default function LoginPage() {
             sx={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', mb: 2 }}
           />
           <Typography variant="h5" fontWeight={600}>
-            {mode === 'login' ? 'Entrar' : mode === 'register' ? 'Criar conta' : 'Ativar conta'}
+            {mode === 'login' && 'Entrar'}
+            {mode === 'forgot' && 'Enviar token de autenticação ao email cadastrado'}
+            {mode === 'reset' && 'Redefinir senha'}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {mode === 'login'
-              ? 'Acesso ao painel administrativo'
-              : mode === 'register'
-                ? 'Cadastre seu email e defina sua senha'
-                : 'Informe o token de ativacao para liberar o acesso'}
+            {mode === 'login' && 'Acesso ao painel administrativo'}
+            {mode === 'forgot' && 'Digite seu email para receber o token por e-mail'}
+            {mode === 'reset' && 'Insira o token recebido por e-mail e defina a nova senha (com confirmação)'}
           </Typography>
         </Box>
 
@@ -177,9 +180,10 @@ export default function LoginPage() {
           <Box component="form" onSubmit={handleLoginSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Email"
+              type="email"
               size="small"
-              value={loginValue}
-              onChange={(e) => setLoginValue(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
               autoFocus
               fullWidth
@@ -199,45 +203,29 @@ export default function LoginPage() {
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 1 }}>
-              Nao tem conta?{' '}
-              <Link component="button" type="button" variant="body2" onClick={goToRegister} sx={{ cursor: 'pointer' }}>
-                Cadastrar administrador
+              <Link component="button" type="button" variant="body2" onClick={goToForgot} sx={{ cursor: 'pointer' }}>
+                Enviar token de autenticação ao email cadastrado
               </Link>
             </Typography>
           </Box>
         )}
 
-        {mode === 'register' && (
-          <Box component="form" onSubmit={handleRegisterSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {mode === 'forgot' && (
+          <Box component="form" onSubmit={handleForgotSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Email"
+              label="Email cadastrado"
               type="email"
               size="small"
-              value={registerEmail}
-              onChange={(e) => setRegisterEmail(e.target.value)}
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              placeholder="Digite seu email"
+              fullWidth
               autoFocus
-              fullWidth
-            />
-            <TextField
-              label="Senha (minimo 8 caracteres)"
-              type="password"
-              size="small"
-              value={registerPassword}
-              onChange={(e) => setRegisterPassword(e.target.value)}
-              fullWidth
-            />
-            <TextField
-              label="Confirmar senha"
-              type="password"
-              size="small"
-              value={registerConfirm}
-              onChange={(e) => setRegisterConfirm(e.target.value)}
-              fullWidth
             />
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
             <Button type="submit" variant="contained" size="medium" fullWidth sx={{ mt: 1 }} disabled={loading}>
-              {loading ? 'Registrando...' : 'Registrar e receber token'}
+              {loading ? 'Enviando...' : 'Enviar token de autenticação ao email cadastrado'}
             </Button>
             <Button type="button" variant="text" size="small" fullWidth onClick={goToLogin}>
               Voltar ao login
@@ -245,29 +233,42 @@ export default function LoginPage() {
           </Box>
         )}
 
-        {mode === 'activate' && (
-          <Box component="form" onSubmit={handleActivateSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {mode === 'reset' && (
+          <Box component="form" onSubmit={handleResetSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Token de ativacao"
+              label="Token recebido por e-mail"
               size="small"
-              value={activationToken}
-              onChange={(e) => setActivationToken(e.target.value)}
-              placeholder="Cole o token recebido"
+              value={resetToken}
+              onChange={(e) => setResetToken(e.target.value)}
+              placeholder="Cole o token no espaço definido"
               fullWidth
               autoFocus
             />
-            {devActivationToken && (
-              <Alert severity="info">
-                Em desenvolvimento: use o token <strong>{devActivationToken}</strong> (tambem no console do backend).
-              </Alert>
-            )}
+            <TextField
+              label="Nova senha"
+              type="password"
+              size="small"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Mínimo 8 caracteres"
+              fullWidth
+            />
+            <TextField
+              label="Confirmar nova senha"
+              type="password"
+              size="small"
+              value={newPasswordConfirm}
+              onChange={(e) => setNewPasswordConfirm(e.target.value)}
+              placeholder="Digite a nova senha novamente para confirmar"
+              fullWidth
+            />
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
             <Button type="submit" variant="contained" size="medium" fullWidth sx={{ mt: 1 }} disabled={loading}>
-              {loading ? 'Ativando...' : 'Ativar conta'}
+              {loading ? 'Alterando...' : 'Redefinir senha'}
             </Button>
-            <Button type="button" variant="text" size="small" fullWidth onClick={goToRegister}>
-              Voltar ao cadastro
+            <Button type="button" variant="text" size="small" fullWidth onClick={goToLogin}>
+              Voltar ao login
             </Button>
           </Box>
         )}
