@@ -308,7 +308,6 @@ export default function NewOrderPage() {
   const handleSubmit = async () => {
     if (!form) return
     const identifiersToUse = confirmAndPossiblyRevertCustomerIdentifierChanges()
-    const name = fullName(form.customerFirstName, form.customerLastName)
     const orderId = form.id.trim().toUpperCase()
     if (!orderId) {
       setSubmitError('Preencha o ID do pedido ou use "Gerar novo" para obter um ID automático.')
