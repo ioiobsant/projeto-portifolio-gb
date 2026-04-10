@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+const API_BASE = import.meta.env.VITE_API_URL
 
 const CSRF_COOKIE_NAME = 'gba_csrf'
 const AUTH_REFRESH_PATH = '/auth/refresh'

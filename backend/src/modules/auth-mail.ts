@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 import { env } from "../config/env";
 
 function buildResetPasswordLink(token: string): string {
-  const baseUrl = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+  const baseUrl = env.frontendUrl;
   return `${baseUrl}/login?reset=${encodeURIComponent(token)}`;
 }
 
@@ -48,7 +48,7 @@ export async function sendPasswordResetEmail(to: string, token: string): Promise
 }
 
 function buildInviteLink(token: string): string {
-  const baseUrl = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+  const baseUrl = env.frontendUrl;
   return `${baseUrl}/convite?token=${encodeURIComponent(token)}`;
 }
 
