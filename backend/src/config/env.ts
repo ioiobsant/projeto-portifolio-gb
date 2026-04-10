@@ -14,7 +14,11 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? "",
   smtpPass: process.env.SMTP_PASS ?? "",
   smtpFrom: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "",
-  corsOrigins: (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+  frontendUrl: (process.env.FRONTEND_URL ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)[0] ?? "",
+  corsOrigins: (process.env.CORS_ORIGIN ?? "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
