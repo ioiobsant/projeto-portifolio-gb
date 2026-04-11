@@ -10,6 +10,20 @@ export default defineConfig({
     devOptions: { enabled: true },
     workbox: {
       maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      globIgnores: ['**/manifest.webmanifest'],
+      runtimeCaching: [
+        {
+          urlPattern: /^\/manifest\.webmanifest$/,
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'manifest',
+            expiration: {
+              maxEntries: 1,
+              maxAgeSeconds: 3600,
+            },
+          },
+        },
+      ],
     },
     manifest: {
       name: 'Genice Brandão Atelier',
