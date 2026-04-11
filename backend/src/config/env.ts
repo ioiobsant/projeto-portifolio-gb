@@ -8,6 +8,23 @@ const isProd = process.env.NODE_ENV === "production";
 const frontendOrigins = parseOrigins(process.env.FRONTEND_URL);
 const corsOriginsFromEnv = parseOrigins(process.env.CORS_ORIGIN);
 
+const buildCorsOrigins = () => {
+  const origins = Array.from(
+    new Set([
+      ...corsOriginsFromEnv,
+      ...frontendOrigins,
+      ...(!isProd ? ["http://localhost:5173", "http://localhost:5174"] : []),
+    ])
+  );
+
+  // Add *.vercel.app pattern for preview deployments
+  if (isProd) {
+    origins.push("*.vercel.app");
+  }
+
+  return origins;
+};
+
 export const env = {
   isProd,
   jwtSecret: process.env.JWT_SECRET ?? "dev-secret-alterar-em-producao",
@@ -25,12 +42,6 @@ export const env = {
   smtpPass: process.env.SMTP_PASS ?? "",
   smtpFrom: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "",
   frontendUrl: frontendOrigins[0] ?? "",
-  corsOrigins: Array.from(
-    new Set([
-      ...corsOriginsFromEnv,
-      ...frontendOrigins,
-      ...(!isProd ? ["http://localhost:5173", "http://localhost:5174"] : []),
-    ])
-  ),
+  corsOrigins: buildCorsOrigins(),
   port: Number(process.env.PORT ?? 3001),
 };

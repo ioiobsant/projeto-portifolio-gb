@@ -12,10 +12,22 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
 
 const app = express();
 
+function isOriginAllowed(origin: string, allowedOrigins: string[]): boolean {
+  for (const allowed of allowedOrigins) {
+    if (allowed === origin) return true;
+    // Support wildcard patterns like *.vercel.app
+    if (allowed.includes("*")) {
+      const pattern = allowed.replace(/\*/g, ".*");
+      if (new RegExp(`^${pattern}$`).test(origin)) return true;
+    }
+  }
+  return false;
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || env.corsOrigins.includes(origin)) {
+      if (!origin || isOriginAllowed(origin, env.corsOrigins)) {
         callback(null, true);
         return;
       }
