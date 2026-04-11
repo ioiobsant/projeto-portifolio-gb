@@ -1,6 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname.includes('vercel') 
-    ? 'https://projeto-portifolio-gb.onrender.com' 
+const envApiBase = (import.meta.env.VITE_API_URL ?? '').trim()
+const isLegacyApiBase = envApiBase.includes('gb-atelier-backend.vercel.app')
+
+const API_BASE = envApiBase && !isLegacyApiBase
+  ? envApiBase
+  : (typeof window !== 'undefined' && window.location.hostname.includes('vercel')
+    ? 'https://projeto-portifolio-gb.onrender.com'
     : 'http://localhost:3001')
 
 const CSRF_COOKIE_NAME = 'gba_csrf'
