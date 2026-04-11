@@ -149,9 +149,11 @@ export function mapAdminToPublic(admin: AdminPublic): AdminPublic {
 }
 
 export function setAuthCookies(res: Response, payload: AuthCookies) {
+  const sameSite: "none" | "lax" = env.isProd ? "none" : "lax";
+
   const common = {
     secure: env.isProd,
-    sameSite: "lax" as const,
+    sameSite,
     path: "/",
   };
 
@@ -175,9 +177,11 @@ export function setAuthCookies(res: Response, payload: AuthCookies) {
 }
 
 export function clearAuthCookies(res: Response) {
+  const sameSite: "none" | "lax" = env.isProd ? "none" : "lax";
+
   const common = {
     secure: env.isProd,
-    sameSite: "lax" as const,
+    sameSite,
     path: "/",
   };
 
