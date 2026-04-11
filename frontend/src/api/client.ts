@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_URL
+const API_BASE = import.meta.env.VITE_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname.includes('vercel') 
+    ? 'https://projeto-portifolio-gb.onrender.com' 
+    : 'http://localhost:3001')
 
 const CSRF_COOKIE_NAME = 'gba_csrf'
 const AUTH_REFRESH_PATH = '/auth/refresh'
