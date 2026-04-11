@@ -32,5 +32,5 @@ export const env = {
       ...(!isProd ? ["http://localhost:5173", "http://localhost:5174"] : []),
     ])
   ),
-  port: process.env.PORT ?? 3001,
+  port: Number(process.env.PORT ?? 3001),
 };

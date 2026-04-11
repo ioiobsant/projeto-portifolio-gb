@@ -30,6 +30,6 @@ app.use("/auth", authRouter);
 app.use("/orders", requireAuth, requireCsrfForWrites, ordersRouter);
 app.use("/customers", requireAuth, requireCsrfForWrites, customersRouter);
 
-app.listen(env.port, () => {
-  console.log(`Backend rodando em http://localhost:${env.port}`);
+app.listen(env.port, "0.0.0.0", () => {
+  console.log(`Backend rodando na porta ${env.port}`);
 });
