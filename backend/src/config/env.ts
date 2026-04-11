@@ -1,5 +1,15 @@
+const parseOrigins = (value?: string) =>
+  (value ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const isProd = process.env.NODE_ENV === "production";
+const frontendOrigins = parseOrigins(process.env.FRONTEND_URL);
+const corsOriginsFromEnv = parseOrigins(process.env.CORS_ORIGIN);
+
 export const env = {
-  isProd: process.env.NODE_ENV === "production",
+  isProd,
   jwtSecret: process.env.JWT_SECRET ?? "dev-secret-alterar-em-producao",
   accessTokenTtlMinutes: Number(process.env.ACCESS_TOKEN_TTL_MINUTES ?? 15),
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7),
@@ -14,13 +24,13 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? "",
   smtpPass: process.env.SMTP_PASS ?? "",
   smtpFrom: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "",
-  frontendUrl: (process.env.FRONTEND_URL ?? "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean)[0] ?? "",
-  corsOrigins: (process.env.CORS_ORIGIN ?? "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  frontendUrl: frontendOrigins[0] ?? "",
+  corsOrigins: Array.from(
+    new Set([
+      ...corsOriginsFromEnv,
+      ...frontendOrigins,
+      ...(!isProd ? ["http://localhost:5173", "http://localhost:5174"] : []),
+    ])
+  ),
   port: process.env.PORT ?? 3001,
 };
