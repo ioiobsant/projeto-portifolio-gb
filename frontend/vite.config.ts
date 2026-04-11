@@ -8,6 +8,9 @@ export default defineConfig({
   plugins: [react(), VitePWA({ 
     registerType: 'autoUpdate',
     devOptions: { enabled: true },
+    workbox: {
+      maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+    },
     manifest: {
       name: 'Genice Brandão Atelier',
       short_name: 'GB Atelier',
