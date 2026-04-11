@@ -53,6 +53,10 @@ function getCsrfToken(): string {
   return readCookie(CSRF_COOKIE_NAME)
 }
 
+function hasSessionHint(): boolean {
+  return Boolean(getCsrfToken())
+}
+
 function shouldAttachCsrf(method: string): boolean {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())
 }
@@ -66,6 +70,10 @@ function getUrl(path: string, params?: Record<string, string>): string {
 }
 
 async function tryRefreshSession(): Promise<boolean> {
+  if (!hasSessionHint()) {
+    return false
+  }
+
   if (refreshPromise) {
     return refreshPromise
   }
@@ -140,4 +148,4 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   return response.json()
 }
 
-export { API_BASE, request }
+export { API_BASE, hasSessionHint, request }

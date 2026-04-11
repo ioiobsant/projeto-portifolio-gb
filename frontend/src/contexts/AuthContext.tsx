@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as authApi from '../api/auth'
+import { hasSessionHint } from '../api/client'
 import type { AuthUser } from '../api/auth'
 
 interface AuthContextValue {
@@ -56,6 +57,14 @@ export function AuthContextProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     const bootstrap = async () => {
+      if (!hasSessionHint()) {
+        if (!cancelled) {
+          setUser(null)
+          setIsBootstrapping(false)
+        }
+        return
+      }
+
       try {
         const response = await authApi.me()
         if (!cancelled) setUser(response.user)
